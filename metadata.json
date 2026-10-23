@@ -1,0 +1,6 @@
+{
+  "name": "OTP Doctor - SMS Verification Marketplace & Admin Suite",
+  "description": "Production-ready SMS OTP service marketplace and Super Admin panel featuring live provider sync, automated number allocation, OTP polling, wallet management, Razorpay, and manual QR payments.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
