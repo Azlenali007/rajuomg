@@ -21,3 +21,10 @@ Router::get('/orders', [OrderController::class, 'listOrders']);
 Router::get('/order', [OrderController::class, 'showOrder']);
 Router::get('/wallet', [WalletController::class, 'showWallet']);
 Router::post('/wallet/manual', [WalletController::class, 'submitManual']);
+
+// Web-Based Installation Wizard route
+Router::get('/install', function() {
+    require_once dirname(__DIR__) . '/public/install/index.php';
+    exit;
+});
+

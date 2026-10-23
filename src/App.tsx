@@ -80,9 +80,32 @@ const INITIAL_COUNTRIES = [
 
 export default function App() {
   // Navigation mode
-  const [activePortal, setActivePortal] = useState<'user' | 'admin' | 'code'>('user');
+  const [activePortal, setActivePortal] = useState<'user' | 'admin' | 'installer' | 'code'>('user');
   const [userTab, setUserTab] = useState<'services' | 'order' | 'orders' | 'wallet'>('services');
   const [adminTab, setAdminTab] = useState<'dashboard' | 'providers' | 'services' | 'orders' | 'users' | 'payments'>('dashboard');
+
+  // Web Installer State (8 Steps)
+  const [installerStep, setInstallerStep] = useState<number>(1);
+  const [isSystemInstalled, setIsSystemInstalled] = useState<boolean>(true); // Can be toggled for demo
+  const [installDbHost, setInstallDbHost] = useState<string>('127.0.0.1');
+  const [installDbPort, setInstallDbPort] = useState<number>(3306);
+  const [installDbName, setInstallDbName] = useState<string>('otp_platform');
+  const [installDbUser, setInstallDbUser] = useState<string>('root');
+  const [installDbPass, setInstallDbPass] = useState<string>('');
+  const [installDbTested, setInstallDbTested] = useState<boolean>(false);
+  const [installDbTesting, setInstallDbTesting] = useState<boolean>(false);
+  const [installDbMsg, setInstallDbMsg] = useState<string | null>(null);
+
+  const [installSiteName, setInstallSiteName] = useState<string>('OTP Doctor Verification');
+  const [installAppUrl, setInstallAppUrl] = useState<string>(window.location.origin);
+  const [installTimezone, setInstallTimezone] = useState<string>('UTC');
+  const [installCurrency, setInstallCurrency] = useState<string>('USD');
+
+  const [installAdminName, setInstallAdminName] = useState<string>('Super Administrator');
+  const [installAdminEmail, setInstallAdminEmail] = useState<string>('admin@otpdoctor.in');
+  const [installAdminPass, setInstallAdminPass] = useState<string>('AdminSecure#2026');
+  const [installingProgress, setInstallingProgress] = useState<boolean>(false);
+  const [installLogs, setInstallLogs] = useState<string[]>([]);
 
   // User state
   const [walletBalance, setWalletBalance] = useState<number>(14.50);
@@ -354,6 +377,52 @@ export default function App() {
     }, 900);
   };
 
+  // Web Installer Step Handlers
+  const handleTestInstallerDb = () => {
+    if (!installDbName.trim()) {
+      setInstallDbMsg('Database name cannot be empty.');
+      setInstallDbTested(false);
+      return;
+    }
+    setInstallDbTesting(true);
+    setInstallDbMsg(null);
+    setTimeout(() => {
+      setInstallDbTesting(false);
+      setInstallDbTested(true);
+      setInstallDbMsg(`✔ PDO MySQL Handshake Successful! Connected to database '${installDbName}' at ${installDbHost}:${installDbPort}.`);
+      showToast('Database connection verified!');
+    }, 800);
+  };
+
+  const handleRunInstallerExecution = () => {
+    if (installAdminPass.length < 8) {
+      showToast('Super Admin password must be at least 8 characters long.');
+      return;
+    }
+    setInstallingProgress(true);
+    setInstallerStep(6);
+    setInstallLogs([
+      'Initiating PDO connection to MySQL 8+ engine...',
+      `Database selected: ${installDbName}`,
+      'Reading and parsing database/schema.sql...',
+      'Creating tables: users, wallets, wallet_transactions, providers, countries, services, provider_services, orders, payments, manual_payment_requests, audit_logs...',
+      'Applying performance indexes and foreign key constraints from database/indexes.sql...',
+      'Seeding initial verification services and OTP Doctor provider mappings from database/seed.sql...',
+      `Provisioning Single Super Admin account (${installAdminEmail}) with bcrypt hash...`,
+      'Configuring site settings (name, base URL, currency)...',
+      'Generating production config/database.php and .env file...',
+      'Creating permanent lock: storage/installed.lock...',
+      'Installation execution finished successfully!'
+    ]);
+
+    setTimeout(() => {
+      setInstallingProgress(false);
+      setIsSystemInstalled(true);
+      setInstallerStep(8);
+      showToast('✔ Installation completed successfully! Application locked.');
+    }, 2200);
+  };
+
   return (
     <div className="min-h-screen bg-[#faf8ff] text-slate-800 flex flex-col font-sans">
       
@@ -408,11 +477,21 @@ export default function App() {
                 <span>Super Admin Panel</span>
               </button>
               <button 
+                onClick={() => setActivePortal('installer')}
+                className={`flex items-center gap-1.5 transition-colors whitespace-nowrap ${activePortal === 'installer' ? 'text-purple-700 font-bold border-b-2 border-purple-700 pb-0.5' : 'text-slate-600 hover:text-purple-700'}`}
+              >
+                <Terminal className="w-4 h-4 text-purple-600" />
+                <span>Web Installer (/install)</span>
+                <span className={`text-[10px] px-1.5 py-0.2 rounded font-mono font-bold ${isSystemInstalled ? 'bg-slate-100 text-slate-500' : 'bg-amber-100 text-amber-800'}`}>
+                  {isSystemInstalled ? 'LOCKED' : 'READY'}
+                </span>
+              </button>
+              <button 
                 onClick={() => setActivePortal('code')}
                 className={`flex items-center gap-1.5 transition-colors whitespace-nowrap ${activePortal === 'code' ? 'text-purple-700 font-bold border-b-2 border-purple-700 pb-0.5' : 'text-slate-500 hover:text-slate-800'}`}
               >
                 <Database className="w-4 h-4 text-slate-500" />
-                <span>PHP & SQL Codebase</span>
+                <span>PHP & SQL Files</span>
               </button>
             </nav>
 
@@ -1260,6 +1339,486 @@ export default function App() {
                     </tbody>
                   </table>
                 </div>
+              </div>
+            )}
+
+          </div>
+        )}
+
+        {/* =========================================================================
+            WEB-BASED INSTALLATION WIZARD PORTAL (/install)
+            ========================================================================= */}
+        {activePortal === 'installer' && (
+          <div className="space-y-6 max-w-4xl mx-auto">
+            
+            {/* Installer Simulation & Lock Controls */}
+            <div className="bg-purple-50 border border-purple-200 rounded-2xl p-4 flex flex-col sm:flex-row items-center justify-between gap-4 text-xs">
+              <div className="flex items-center gap-2">
+                <Terminal className="w-4 h-4 text-purple-700" />
+                <span className="font-semibold text-purple-900">Endpoint: <code className="font-mono bg-white px-2 py-0.5 rounded border border-purple-200">https://yourdomain.com/install</code></span>
+                <span aria-hidden="true" className="text-purple-300">·</span>
+                <span className="text-purple-700">Lock File: <code className="font-mono">storage/installed.lock</code></span>
+              </div>
+              <div className="flex items-center gap-2">
+                <span className="text-slate-500">Simulate State:</span>
+                <button 
+                  onClick={() => setIsSystemInstalled(!isSystemInstalled)}
+                  className={`px-3 py-1 rounded-lg font-bold text-xs transition-colors ${isSystemInstalled ? 'bg-purple-700 text-white' : 'bg-slate-200 text-slate-700 hover:bg-slate-300'}`}
+                >
+                  {isSystemInstalled ? 'Locked (Already Installed)' : 'Unlocked (Ready to Install)'}
+                </button>
+              </div>
+            </div>
+
+            {/* When System is Already Installed and Locked */}
+            {isSystemInstalled && installerStep !== 8 ? (
+              <div className="bg-white border border-purple-200 rounded-2xl p-8 sm:p-12 shadow-sm text-center space-y-5 max-w-xl mx-auto">
+                <div className="w-16 h-16 rounded-2xl bg-emerald-50 text-emerald-600 flex items-center justify-center mx-auto shadow-xs">
+                  <Shield className="w-8 h-8" />
+                </div>
+                <div className="space-y-1.5">
+                  <h2 className="text-2xl font-bold tracking-tight text-slate-900">Application Already Installed</h2>
+                  <p className="text-xs text-slate-500">
+                    The platform has already been initialized and permanently locked with <code className="font-mono bg-slate-100 px-1.5 py-0.5 rounded text-purple-700 font-bold">storage/installed.lock</code> to prevent accidental database overwriting.
+                  </p>
+                </div>
+
+                <div className="bg-slate-50 border border-slate-200 rounded-xl p-4 text-xs text-slate-600 text-left space-y-1">
+                  <div>✔ Database tables & indexes active</div>
+                  <div>✔ Single Super Admin account provisioned</div>
+                  <div>✔ Reinstallation blocked by web server</div>
+                </div>
+
+                <div className="pt-2 flex flex-col sm:flex-row items-center justify-center gap-3">
+                  <button 
+                    onClick={() => { setActivePortal('admin'); setAdminTab('dashboard'); }}
+                    className="w-full sm:w-auto px-5 py-2.5 text-xs font-bold text-white bg-purple-700 hover:bg-purple-800 rounded-xl shadow-xs transition-colors"
+                  >
+                    Go to Super Admin Panel
+                  </button>
+                  <button 
+                    onClick={() => { setActivePortal('user'); setUserTab('services'); }}
+                    className="w-full sm:w-auto px-5 py-2.5 text-xs font-bold text-slate-700 bg-slate-100 hover:bg-slate-200 rounded-xl transition-colors"
+                  >
+                    Go to User Marketplace
+                  </button>
+                </div>
+                
+                <div className="pt-2">
+                  <button 
+                    onClick={() => { setIsSystemInstalled(false); setInstallerStep(1); }}
+                    className="text-[11px] text-purple-600 hover:underline font-semibold"
+                  >
+                    Click to test run the 8-Step Installation Wizard again →
+                  </button>
+                </div>
+              </div>
+            ) : (
+
+              /* The Full 8-Step Wizard */
+              <div className="space-y-6">
+
+                {/* 8-Step Progress Indicator */}
+                <div className="grid grid-cols-4 sm:grid-cols-8 gap-2 text-center text-[10px] font-bold">
+                  {['1. Welcome', '2. Requirements', '3. Database', '4. Website', '5. Admin', '6. Install', '7. Config', '8. Complete'].map((label, idx) => {
+                    const stepNum = idx + 1;
+                    const isDone = installerStep > stepNum;
+                    const isCurrent = installerStep === stepNum;
+                    return (
+                      <div key={label} className="space-y-1">
+                        <div className={`h-1.5 rounded-full transition-all ${isDone ? 'bg-purple-700' : isCurrent ? 'bg-purple-500 animate-pulse' : 'bg-slate-200'}`} />
+                        <span className={`block truncate ${isCurrent ? 'text-purple-700 font-extrabold' : isDone ? 'text-slate-800' : 'text-slate-400'}`}>
+                          {label}
+                        </span>
+                      </div>
+                    );
+                  })}
+                </div>
+
+                <div className="bg-white border border-purple-200 rounded-2xl p-6 sm:p-10 shadow-sm space-y-6">
+
+                  {/* STEP 1: WELCOME PAGE */}
+                  {installerStep === 1 && (
+                    <div className="space-y-6 text-center py-4">
+                      <div className="w-20 h-20 rounded-2xl bg-purple-100 text-purple-700 flex items-center justify-center font-extrabold text-3xl mx-auto shadow-sm">
+                        OD
+                      </div>
+                      <div className="space-y-2">
+                        <h2 className="text-2xl font-bold tracking-tight text-slate-900">Welcome to OTP Doctor Web Installer</h2>
+                        <p className="text-xs text-slate-500 max-w-md mx-auto">
+                          This wizard sets up your MySQL database, single Super Admin credentials, and essential settings without requiring command-line tools.
+                        </p>
+                      </div>
+
+                      <div className="bg-purple-50 border border-purple-200 rounded-xl p-4 text-xs text-purple-900 text-left max-w-md mx-auto space-y-1.5">
+                        <div className="font-bold">What will be configured:</div>
+                        <ul className="list-disc list-inside space-y-0.5 text-purple-800">
+                          <li>Server compatibility and PHP extension verification</li>
+                          <li>MySQL PDO connection and automatic database initialization</li>
+                          <li>Automated schema, indexes, and initial services seeding</li>
+                          <li>Single Super Admin account provisioning</li>
+                          <li>Permanent installation lock (<code className="font-mono">storage/installed.lock</code>)</li>
+                        </ul>
+                      </div>
+
+                      <div className="pt-2">
+                        <button 
+                          onClick={() => setInstallerStep(2)}
+                          className="px-8 py-3 text-xs font-bold text-white bg-purple-700 hover:bg-purple-800 rounded-xl shadow-xs transition-colors"
+                        >
+                          Start Installation →
+                        </button>
+                      </div>
+                    </div>
+                  )}
+
+                  {/* STEP 2: SERVER REQUIREMENTS */}
+                  {installerStep === 2 && (
+                    <div className="space-y-6">
+                      <div className="border-b border-slate-100 pb-4">
+                        <h2 className="text-xl font-bold text-slate-900">Step 2: Server Compatibility & Requirements</h2>
+                        <p className="text-xs text-slate-500">Checking hosting environment, PHP extensions, and folder write permissions.</p>
+                      </div>
+
+                      <div className="divide-y divide-slate-100 text-xs">
+                        <div className="py-3 flex items-center justify-between">
+                          <div>
+                            <span className="font-bold text-slate-900 block">PHP Version (&gt;= 8.2.0)</span>
+                            <span className="text-slate-400 font-mono">Environment: PHP 8.3.6 Stable</span>
+                          </div>
+                          <span className="font-bold px-2.5 py-1 rounded-md text-[11px] bg-emerald-50 text-emerald-700 border border-emerald-200">
+                            ✔ Compatible
+                          </span>
+                        </div>
+
+                        {[
+                          { name: 'pdo', label: 'PDO (PHP Data Objects)' },
+                          { name: 'pdo_mysql', label: 'MySQL PDO Driver' },
+                          { name: 'curl', label: 'cURL HTTP Client' },
+                          { name: 'mbstring', label: 'Multibyte String' },
+                          { name: 'json', label: 'JSON Serializer' },
+                          { name: 'openssl', label: 'OpenSSL Security' }
+                        ].map(ext => (
+                          <div key={ext.name} className="py-2.5 flex items-center justify-between">
+                            <span className="font-semibold text-slate-800">{ext.label} (<code className="font-mono text-purple-700 font-bold">{ext.name}</code>)</span>
+                            <span className="font-bold px-2 py-0.5 rounded text-[10px] bg-emerald-50 text-emerald-700 border border-emerald-200">
+                              ✔ Enabled
+                            </span>
+                          </div>
+                        ))}
+
+                        <div className="py-3 flex items-center justify-between">
+                          <div>
+                            <span className="font-bold text-slate-900 block">Directory Permissions</span>
+                            <span className="text-slate-400 font-mono">config/ & storage/logs/</span>
+                          </div>
+                          <span className="font-bold px-2.5 py-1 rounded-md text-[11px] bg-emerald-50 text-emerald-700 border border-emerald-200">
+                            ✔ Writable (0755)
+                          </span>
+                        </div>
+                      </div>
+
+                      <div className="flex items-center justify-between pt-4 border-t border-slate-100">
+                        <button onClick={() => setInstallerStep(1)} className="px-4 py-2 text-xs font-semibold text-slate-600 hover:bg-slate-100 rounded-lg">← Back</button>
+                        <button 
+                          onClick={() => setInstallerStep(3)}
+                          className="px-6 py-2.5 text-xs font-bold text-white bg-purple-700 hover:bg-purple-800 rounded-xl shadow-xs transition-colors"
+                        >
+                          Next: Database Configuration →
+                        </button>
+                      </div>
+                    </div>
+                  )}
+
+                  {/* STEP 3: DATABASE CONFIGURATION */}
+                  {installerStep === 3 && (
+                    <div className="space-y-6">
+                      <div className="border-b border-slate-100 pb-4">
+                        <h2 className="text-xl font-bold text-slate-900">Step 3: Database Configuration</h2>
+                        <p className="text-xs text-slate-500">Provide your MySQL database credentials. We test the connection before proceeding.</p>
+                      </div>
+
+                      <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+                        <div className="sm:col-span-2">
+                          <label className="block text-xs font-semibold text-slate-700">MySQL Host</label>
+                          <input 
+                            type="text" 
+                            value={installDbHost} 
+                            onChange={(e) => setInstallDbHost(e.target.value)}
+                            className="mt-1 w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl text-xs font-mono font-semibold" 
+                            placeholder="127.0.0.1 or localhost"
+                          />
+                        </div>
+                        <div>
+                          <label className="block text-xs font-semibold text-slate-700">Port</label>
+                          <input 
+                            type="number" 
+                            value={installDbPort} 
+                            onChange={(e) => setInstallDbPort(Number(e.target.value))}
+                            className="mt-1 w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl text-xs font-mono font-semibold" 
+                            placeholder="3306"
+                          />
+                        </div>
+                      </div>
+
+                      <div>
+                        <label className="block text-xs font-semibold text-slate-700">Database Name</label>
+                        <input 
+                          type="text" 
+                          value={installDbName} 
+                          onChange={(e) => setInstallDbName(e.target.value)}
+                          className="mt-1 w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl text-xs font-mono font-semibold" 
+                          placeholder="otp_platform"
+                        />
+                        <span className="text-[11px] text-slate-400 mt-1 block">If the database doesn't exist, the installer will attempt to create it automatically.</span>
+                      </div>
+
+                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                        <div>
+                          <label className="block text-xs font-semibold text-slate-700">Database Username</label>
+                          <input 
+                            type="text" 
+                            value={installDbUser} 
+                            onChange={(e) => setInstallDbUser(e.target.value)}
+                            className="mt-1 w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl text-xs font-mono font-semibold" 
+                            placeholder="root"
+                          />
+                        </div>
+                        <div>
+                          <label className="block text-xs font-semibold text-slate-700">Database Password</label>
+                          <input 
+                            type="password" 
+                            value={installDbPass} 
+                            onChange={(e) => setInstallDbPass(e.target.value)}
+                            className="mt-1 w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl text-xs font-mono" 
+                            placeholder="••••••••"
+                          />
+                        </div>
+                      </div>
+
+                      {installDbMsg && (
+                        <div className={`p-3 rounded-xl text-xs font-medium ${installDbTested ? 'bg-emerald-50 text-emerald-800 border border-emerald-200' : 'bg-rose-50 text-rose-800 border border-rose-200'}`}>
+                          {installDbMsg}
+                        </div>
+                      )}
+
+                      <div className="flex items-center justify-between pt-4 border-t border-slate-100">
+                        <button onClick={() => setInstallerStep(2)} className="px-4 py-2 text-xs font-semibold text-slate-600 hover:bg-slate-100 rounded-lg">← Back</button>
+                        <div className="flex items-center gap-3">
+                          <button 
+                            onClick={handleTestInstallerDb}
+                            disabled={installDbTesting}
+                            className="px-4 py-2 text-xs font-bold text-purple-700 bg-purple-50 hover:bg-purple-100 border border-purple-200 rounded-xl transition-colors flex items-center gap-2"
+                          >
+                            <RefreshCw className={`w-3.5 h-3.5 ${installDbTesting ? 'animate-spin' : ''}`} />
+                            <span>{installDbTesting ? 'Testing Handshake...' : 'Test Connection'}</span>
+                          </button>
+                          <button 
+                            onClick={() => {
+                              if (!installDbTested) {
+                                handleTestInstallerDb();
+                              }
+                              setInstallerStep(4);
+                            }}
+                            className="px-6 py-2.5 text-xs font-bold text-white bg-purple-700 hover:bg-purple-800 rounded-xl shadow-xs transition-colors"
+                          >
+                            Next: Website Configuration →
+                          </button>
+                        </div>
+                      </div>
+                    </div>
+                  )}
+
+                  {/* STEP 4: WEBSITE CONFIGURATION */}
+                  {installerStep === 4 && (
+                    <div className="space-y-6">
+                      <div className="border-b border-slate-100 pb-4">
+                        <h2 className="text-xl font-bold text-slate-900">Step 4: Website Configuration</h2>
+                        <p className="text-xs text-slate-500">Configure your website name, base URL, timezone, and platform currency.</p>
+                      </div>
+
+                      <div>
+                        <label className="block text-xs font-semibold text-slate-700">Website Branding Name</label>
+                        <input 
+                          type="text" 
+                          value={installSiteName} 
+                          onChange={(e) => setInstallSiteName(e.target.value)}
+                          className="mt-1 w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl text-xs font-semibold" 
+                          placeholder="OTP Doctor Verification"
+                        />
+                      </div>
+
+                      <div>
+                        <label className="block text-xs font-semibold text-slate-700">Domain Base URL (Auto-Detected)</label>
+                        <input 
+                          type="url" 
+                          value={installAppUrl} 
+                          onChange={(e) => setInstallAppUrl(e.target.value)}
+                          className="mt-1 w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl text-xs font-mono font-semibold" 
+                          placeholder="https://yourdomain.com"
+                        />
+                        <span className="text-[11px] text-slate-400 mt-1 block">Used for self-referential payment webhooks and order status callbacks.</span>
+                      </div>
+
+                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                        <div>
+                          <label className="block text-xs font-semibold text-slate-700">Platform Timezone</label>
+                          <select 
+                            value={installTimezone}
+                            onChange={(e) => setInstallTimezone(e.target.value)}
+                            className="mt-1 w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl text-xs font-semibold"
+                          >
+                            <option value="UTC">UTC (Universal Coordinated Time)</option>
+                            <option value="Asia/Kolkata">Asia/Kolkata (IST)</option>
+                            <option value="America/New_York">America/New_York (EST)</option>
+                            <option value="Europe/London">Europe/London (GMT)</option>
+                          </select>
+                        </div>
+                        <div>
+                          <label className="block text-xs font-semibold text-slate-700">Default Currency</label>
+                          <select 
+                            value={installCurrency}
+                            onChange={(e) => setInstallCurrency(e.target.value)}
+                            className="mt-1 w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl text-xs font-semibold"
+                          >
+                            <option value="USD">USD ($)</option>
+                            <option value="INR">INR (₹)</option>
+                            <option value="EUR">EUR (€)</option>
+                          </select>
+                        </div>
+                      </div>
+
+                      <div className="flex items-center justify-between pt-4 border-t border-slate-100">
+                        <button onClick={() => setInstallerStep(3)} className="px-4 py-2 text-xs font-semibold text-slate-600 hover:bg-slate-100 rounded-lg">← Back</button>
+                        <button 
+                          onClick={() => setInstallerStep(5)}
+                          className="px-6 py-2.5 text-xs font-bold text-white bg-purple-700 hover:bg-purple-800 rounded-xl shadow-xs transition-colors"
+                        >
+                          Next: Super Admin Account →
+                        </button>
+                      </div>
+                    </div>
+                  )}
+
+                  {/* STEP 5: ADMIN ACCOUNT CREATION */}
+                  {installerStep === 5 && (
+                    <div className="space-y-6">
+                      <div className="border-b border-slate-100 pb-4">
+                        <div className="flex items-center gap-2">
+                          <h2 className="text-xl font-bold text-slate-900">Step 5: Create Single Super Admin Account</h2>
+                          <span className="text-[10px] font-bold text-purple-700 bg-purple-50 px-2 py-0.5 rounded border border-purple-200">EXACTLY ONE SUPER ADMIN</span>
+                        </div>
+                        <p className="text-xs text-slate-500 mt-1">This account will have exclusive administrative authority. Staff or sub-admin roles are strictly prohibited.</p>
+                      </div>
+
+                      <div>
+                        <label className="block text-xs font-semibold text-slate-700">Administrator Full Name</label>
+                        <input 
+                          type="text" 
+                          value={installAdminName} 
+                          onChange={(e) => setInstallAdminName(e.target.value)}
+                          className="mt-1 w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl text-xs font-semibold" 
+                          placeholder="Super Administrator"
+                        />
+                      </div>
+
+                      <div>
+                        <label className="block text-xs font-semibold text-slate-700">Administrator Email Address</label>
+                        <input 
+                          type="email" 
+                          value={installAdminEmail} 
+                          onChange={(e) => setInstallAdminEmail(e.target.value)}
+                          className="mt-1 w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl text-xs font-mono font-semibold" 
+                          placeholder="admin@otpdoctor.in"
+                        />
+                      </div>
+
+                      <div>
+                        <label className="block text-xs font-semibold text-slate-700">Administrator Password (Min 8 Characters)</label>
+                        <input 
+                          type="password" 
+                          value={installAdminPass} 
+                          onChange={(e) => setInstallAdminPass(e.target.value)}
+                          className="mt-1 w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl text-xs font-mono" 
+                          placeholder="••••••••••••••••"
+                        />
+                      </div>
+
+                      <div className="flex items-center justify-between pt-4 border-t border-slate-100">
+                        <button onClick={() => setInstallerStep(4)} className="px-4 py-2 text-xs font-semibold text-slate-600 hover:bg-slate-100 rounded-lg">← Back</button>
+                        <button 
+                          onClick={handleRunInstallerExecution}
+                          disabled={installingProgress}
+                          className="px-8 py-2.5 text-xs font-bold text-white bg-purple-700 hover:bg-purple-800 rounded-xl shadow-xs transition-colors flex items-center gap-2"
+                        >
+                          <Terminal className="w-3.5 h-3.5" />
+                          <span>Install Tables & Complete Setup →</span>
+                        </button>
+                      </div>
+                    </div>
+                  )}
+
+                  {/* STEP 6 & 7: EXECUTING DATABASE INSTALLATION & CONFIG */}
+                  {installerStep === 6 && (
+                    <div className="space-y-6 text-center py-6">
+                      <div className="w-16 h-16 rounded-2xl bg-purple-100 text-purple-700 flex items-center justify-center mx-auto">
+                        <RefreshCw className="w-8 h-8 animate-spin" />
+                      </div>
+                      <div>
+                        <h2 className="text-xl font-bold text-slate-900">Setting up Database & System</h2>
+                        <p className="text-xs text-slate-500 mt-1">Executing MySQL schema, performance indexes, service mappings, and locking installer...</p>
+                      </div>
+
+                      <div className="max-w-md mx-auto text-left font-mono text-[11px] p-4 bg-slate-900 text-slate-300 rounded-xl space-y-1.5 shadow-md">
+                        {installLogs.map((log, lIdx) => (
+                          <div key={lIdx} className="text-emerald-400">
+                            {log}
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+
+                  {/* STEP 8: INSTALLATION COMPLETE */}
+                  {installerStep === 8 && (
+                    <div className="space-y-6 text-center py-4">
+                      <div className="w-16 h-16 rounded-2xl bg-emerald-50 text-emerald-600 flex items-center justify-center mx-auto shadow-xs">
+                        <CheckCircle2 className="w-8 h-8" />
+                      </div>
+
+                      <div className="space-y-2">
+                        <h2 className="text-2xl font-bold tracking-tight text-slate-900">Installation Successfully Completed!</h2>
+                        <p className="text-xs text-slate-500 max-w-md mx-auto">
+                          The database tables have been created, configuration written to <code className="font-mono text-purple-700 bg-purple-50 px-1 rounded font-bold">config/database.php</code>, and the installer permanently locked.
+                        </p>
+                      </div>
+
+                      <div className="bg-slate-50 border border-slate-200 rounded-xl p-4 text-xs text-slate-700 max-w-md mx-auto text-left space-y-1.5">
+                        <div>Super Admin: <strong className="text-slate-900">{installAdminEmail}</strong></div>
+                        <div>Website URL: <span className="font-mono text-slate-600">{installAppUrl}</span></div>
+                        <div>Lock Status: <strong className="text-emerald-700 font-bold">LOCKED (storage/installed.lock created)</strong></div>
+                        <div>Protection: <span className="text-slate-500">Installer disabled; reinstallation prevented</span></div>
+                      </div>
+
+                      <div className="pt-4 flex flex-col sm:flex-row items-center justify-center gap-3">
+                        <button 
+                          onClick={() => { setActivePortal('admin'); setAdminTab('dashboard'); }}
+                          className="w-full sm:w-auto px-6 py-2.5 text-xs font-bold text-white bg-purple-700 hover:bg-purple-800 rounded-xl shadow-xs transition-colors"
+                        >
+                          Sign In to Super Admin Panel
+                        </button>
+                        <button 
+                          onClick={() => { setActivePortal('user'); setUserTab('services'); }}
+                          className="w-full sm:w-auto px-6 py-2.5 text-xs font-bold text-slate-700 bg-slate-100 hover:bg-slate-200 rounded-xl transition-colors"
+                        >
+                          Visit User Marketplace
+                        </button>
+                      </div>
+                    </div>
+                  )}
+
+                </div>
+
               </div>
             )}
 

@@ -85,42 +85,47 @@ otp-platform/
 
 ---
 
-## 4. Installation & Database Setup
+---
 
-### Step 1: Clone & Configure Environment
-```bash
-cp .env.example .env
-nano .env
-```
-Fill in your database credentials:
-```env
-DB_HOST=127.0.0.1
-DB_PORT=3306
-DB_DATABASE=otp_platform
-DB_USERNAME=otp_user
-DB_PASSWORD=YourSecureDatabasePassword
-```
+## 4. Installation & Setup
 
-### Step 2: Import Database Schema and Seeds
+### Option A: Web-Based Installation Wizard (Recommended)
+
+You do **not** need to run any command-line commands to install the platform. The system features a complete, browser-based 8-step wizard:
+
+1. Point your domain or virtual host to the `public/` directory.
+2. Open your browser and navigate to:
+   ```
+   https://yourdomain.com/install
+   ```
+   *(If the website is not yet installed, visiting any page will automatically redirect you to `/install`).*
+3. Follow the 8-step wizard:
+   - **Step 1: Welcome Page**: Overview and preparation checklist.
+   - **Step 2: Server Requirements**: Live checks for PHP >= 8.2, PDO, cURL, OpenSSL, Mbstring, and folder write permissions.
+   - **Step 3: Database Configuration**: Enter your MySQL host, port, database name, and user credentials. Click **Test Connection** to verify database connectivity.
+   - **Step 4: Website Configuration**: Set your site name, auto-detected domain URL, timezone, and currency.
+   - **Step 5: Admin Account Creation**: Enter the Single Super Admin email and secure password (minimum 8 characters).
+   - **Step 6 & 7: Automated Installation**: Automatically builds all tables (`schema.sql`), performance indexes (`indexes.sql`), base verification services (`seed.sql`), writes `config/database.php` and `.env`.
+   - **Step 8: Installation Complete**: Creates the permanent installation lock (`storage/installed.lock`), blocks subsequent installer access, and displays direct links to the website and admin panel.
+
+---
+
+### Option B: Command-Line (CLI) Setup (For Advanced Administrators)
+
+If preferred, you may also install the application via CLI:
+
 ```bash
-# 1. Create MySQL database
+# 1. Create database and import schema
 mysql -u root -p -e "CREATE DATABASE otp_platform CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;"
-
-# 2. Import tables, indexes, and base seed
 mysql -u root -p otp_platform < database/schema.sql
 mysql -u root -p otp_platform < database/indexes.sql
 mysql -u root -p otp_platform < database/seed.sql
-```
 
-### Step 3: Provision the Single Super Admin
-In compliance with project rules, there is exactly **ONE Super Admin** account. Run the secure CLI provisioner:
-```bash
+# 2. Provision the single Super Admin
 php database/seed_super_admin.php admin@otpdoctor.in YourAdminPassword123 "Super Administrator"
-```
-Output:
-```
-✔ Initial Super Admin created successfully: ID 1 (admin@otpdoctor.in)
-✔ Single Super Admin rule validated.
+
+# 3. Create lock file
+touch storage/installed.lock
 ```
 
 ---

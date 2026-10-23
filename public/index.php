@@ -16,6 +16,14 @@ header('X-Content-Type-Options: nosniff');
 header('X-XSS-Protection: 1; mode=block');
 header('Referrer-Policy: strict-origin-when-cross-origin');
 
+// Check if application is installed; if not, redirect to Web Installer
+$lockFile = dirname(__DIR__) . '/storage/installed.lock';
+$requestUri = parse_url($_SERVER['REQUEST_URI'] ?? '/', PHP_URL_PATH);
+if (!file_exists($lockFile) && !str_starts_with($requestUri, '/install')) {
+    header('Location: /install/index.php');
+    exit;
+}
+
 // Autoloader for application namespaces
 spl_autoload_register(function (string $class) {
     $prefixApp = 'App\\';
