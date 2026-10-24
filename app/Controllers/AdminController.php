@@ -60,10 +60,28 @@ class AdminController
         // Fetch primary provider status
         $provider = $this->pdo->query("SELECT * FROM providers LIMIT 1")->fetch();
 
+        // 7-day trend analytics for Chart.js
+        $chartDates = [];
+        $chartOrders = [];
+        $chartRevenue = [];
+        for ($i = 6; $i >= 0; $i--) {
+            $dayStr = date('Y-m-d', strtotime("-$i days"));
+            $chartDates[] = date('D, M d', strtotime($dayStr));
+            $oCount = (int)$this->pdo->query("SELECT COUNT(*) FROM orders WHERE substr(created_at, 1, 10) = '$dayStr'")->fetchColumn();
+            $rSum = (float)$this->pdo->query("SELECT COALESCE(SUM(amount), 0) FROM wallet_transactions WHERE substr(created_at, 1, 10) = '$dayStr' AND type = 'credit'")->fetchColumn();
+            $chartOrders[] = $oCount;
+            $chartRevenue[] = $rSum;
+        }
+
         View::render('admin/dashboard', [
             'stats' => $stats,
             'recentOrders' => $recentOrders,
-            'provider' => $provider
+            'provider' => $provider,
+            'chartData' => [
+                'labels' => $chartDates,
+                'orders' => $chartOrders,
+                'revenue' => $chartRevenue
+            ]
         ], 'admin');
     }
 

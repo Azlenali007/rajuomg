@@ -39,6 +39,7 @@ class Database
                         PDO::ATTR_ERRMODE => PDO::ERRMODE_EXCEPTION,
                         PDO::ATTR_DEFAULT_FETCH_MODE => PDO::FETCH_ASSOC,
                     ]);
+                    self::$instance->sqliteCreateFunction('NOW', fn() => date('Y-m-d H:i:s'));
                     return self::$instance;
                 }
                 Logger::error("Database Connection Failure: " . $e->getMessage());

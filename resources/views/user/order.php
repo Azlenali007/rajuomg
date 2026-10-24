@@ -1,90 +1,131 @@
 <div x-data="orderLiveMonitor(<?= (int)$order['id'] ?>, '<?= $order['status'] ?>', '<?= addslashes($order['otp_code'] ?? '') ?>')" x-init="initTimer()" class="max-w-2xl mx-auto space-y-6">
 
     <!-- Back Navigation -->
-    <div>
-        <a href="/orders" class="inline-flex items-center gap-2 text-xs font-medium text-slate-500 hover:text-brand-600 transition-colors">
-            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 19l-7-7m0 0l7-7m-7 7h18"></path></svg>
+    <div class="flex items-center justify-between">
+        <a href="/orders" class="inline-flex items-center gap-2 text-xs font-semibold text-slate-500 hover:text-brand-600 transition-colors">
+            <svg class="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="15 18 9 12 15 6"/></svg>
             <span>Back to My Orders</span>
+        </a>
+        <a href="/services" class="text-xs font-semibold text-brand-600 hover:text-brand-800">
+            Order Another Service →
         </a>
     </div>
 
-    <!-- Main Order Card -->
-    <div class="bg-white border border-slate-200 rounded-2xl p-6 sm:p-8 shadow-sm space-y-6">
+    <!-- Main Order & Live Tracking Card -->
+    <div class="bg-white border border-slate-200/90 rounded-3xl p-6 sm:p-8 shadow-sm space-y-6 relative overflow-hidden">
         
         <!-- Header status banner -->
-        <div class="flex items-center justify-between pb-6 border-b border-slate-100">
+        <div class="flex items-start justify-between pb-6 border-b border-slate-100 gap-4">
             <div>
-                <span class="text-xs font-semibold text-brand-700 uppercase tracking-wider block">Activation Order #<?= htmlspecialchars($order['order_number']) ?></span>
-                <h1 class="text-xl font-bold text-slate-900 mt-0.5"><?= htmlspecialchars($order['service_name']) ?> (<?= htmlspecialchars($order['country_name']) ?>)</h1>
+                <span class="text-[11px] font-bold uppercase tracking-wider text-brand-600 block">Activation Order #<?= htmlspecialchars($order['order_number']) ?></span>
+                <h1 class="text-2xl font-extrabold text-slate-900 mt-0.5">
+                    <?= htmlspecialchars($order['service_name']) ?>
+                </h1>
+                <p class="text-xs text-slate-400 mt-0.5 flex items-center gap-1.5">
+                    <span>Region: <strong><?= htmlspecialchars($order['country_name'] ?? 'India') ?></strong></span>
+                    <span>·</span>
+                    <span>Purchased: <?= date('H:i · M d, Y', strtotime($order['created_at'])) ?></span>
+                </p>
             </div>
 
             <!-- Status Pill/Badge -->
-            <div class="text-right">
+            <div class="text-right shrink-0">
                 <span 
-                    class="inline-block px-3 py-1 rounded-full text-xs font-bold font-mono tracking-wide"
+                    class="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-bold font-mono tracking-wide"
                     :class="{
                         'bg-amber-50 text-amber-700 border border-amber-200': status === 'ACTIVE' || status === 'WAITING',
                         'bg-emerald-50 text-emerald-700 border border-emerald-200': status === 'RECEIVED' || status === 'COMPLETED',
                         'bg-rose-50 text-rose-700 border border-rose-200': status === 'CANCELLED' || status === 'EXPIRED'
                     }"
-                    x-text="statusText()"
-                ></span>
-                <span class="block text-[11px] text-slate-400 mt-1 font-mono tabular-nums" x-show="status === 'ACTIVE' || status === 'WAITING'">
-                    Expires in: <strong x-text="formatTime(timeRemaining)"></strong>
+                >
+                    <span class="w-2 h-2 rounded-full" :class="{
+                        'bg-amber-500 animate-pulse': status === 'ACTIVE' || status === 'WAITING',
+                        'bg-emerald-500': status === 'RECEIVED' || status === 'COMPLETED',
+                        'bg-rose-500': status === 'CANCELLED' || status === 'EXPIRED'
+                    }"></span>
+                    <span x-text="statusText()"></span>
                 </span>
+                <div class="text-[11px] text-slate-400 mt-1 font-mono tabular-nums" x-show="status === 'ACTIVE' || status === 'WAITING'">
+                    Window expires in: <strong class="text-slate-700" x-text="formatTime(timeRemaining)"></strong>
+                </div>
             </div>
         </div>
 
-        <!-- Phone Number Presentation -->
-        <div class="bg-slate-50 border border-slate-200 rounded-xl p-5 flex flex-col sm:flex-row items-center justify-between gap-4">
-            <div>
-                <span class="text-xs text-slate-500 block font-medium">Assigned Verification Phone Number</span>
-                <span class="text-2xl font-bold font-mono tabular-nums text-slate-900 tracking-wider">
+        <!-- Phone Number Presentation Box -->
+        <div class="bg-gradient-to-r from-slate-50 to-slate-100/80 border border-slate-200 rounded-2xl p-5 flex flex-col sm:flex-row items-center justify-between gap-4">
+            <div class="text-center sm:text-left">
+                <span class="text-xs text-slate-500 block font-semibold">Dedicated Carrier Number</span>
+                <span class="text-2xl sm:text-3xl font-extrabold font-mono tabular-nums text-slate-900 tracking-wider block mt-0.5 select-all">
                     +<?= htmlspecialchars($order['phone_number']) ?>
                 </span>
+                <span class="text-[11px] text-slate-400 mt-0.5 block">Enter this number into <?= htmlspecialchars($order['service_name']) ?> to request your code</span>
             </div>
             <button 
-                @click="copyText('<?= htmlspecialchars($order['phone_number']) ?>')" 
-                class="px-4 py-2 text-xs font-semibold text-slate-700 bg-white border border-slate-300 hover:bg-slate-100 rounded-lg shadow-sm transition-colors whitespace-nowrap"
+                @click="copyText('+<?= htmlspecialchars($order['phone_number']) ?>', 'Phone number copied!')" 
+                class="px-5 py-2.5 text-xs font-bold text-slate-800 bg-white hover:bg-slate-50 border border-slate-300 rounded-xl shadow-xs transition-all whitespace-nowrap flex items-center gap-2"
             >
-                Copy Number
+                <svg class="w-4 h-4 text-slate-500" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect width="14" height="14" x="8" y="8" rx="2" ry="2"/><path d="M4 16c-1.1 0-2-.9-2-2V4c0-1.1.9-2 2-2h10c1.1 0 2 .9 2 2"/></svg>
+                <span>Copy Number</span>
             </button>
         </div>
 
-        <!-- Live OTP Display Area -->
-        <div class="text-center py-6 px-4 rounded-xl border-2" :class="otpCode ? 'bg-emerald-50 border-emerald-300' : 'bg-brand-50/50 border-dashed border-brand-200'">
+        <!-- Live OTP Display Canvas -->
+        <div 
+            class="text-center py-8 px-6 rounded-2xl border-2 transition-all duration-300" 
+            :class="otpCode ? 'bg-emerald-50/80 border-emerald-400 shadow-lg shadow-emerald-500/10' : 'bg-brand-50/40 border-dashed border-brand-200'"
+        >
             <template x-if="!otpCode">
-                <div class="space-y-3">
-                    <div class="w-12 h-12 rounded-full bg-brand-100 text-brand-600 flex items-center justify-center mx-auto animate-pulse">
-                        <svg class="w-6 h-6 animate-spin" fill="none" viewBox="0 0 24 24"><circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle><path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v8H4z"></path></svg>
+                <div class="space-y-4">
+                    <div class="relative w-16 h-16 mx-auto flex items-center justify-center">
+                        <div class="absolute inset-0 rounded-full bg-brand-500/20 animate-ping"></div>
+                        <div class="w-14 h-14 rounded-full bg-brand-100 text-brand-600 flex items-center justify-center relative shadow-sm">
+                            <svg class="w-7 h-7 animate-spin" fill="none" viewBox="0 0 24 24">
+                                <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+                                <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v8H4z"></path>
+                            </svg>
+                        </div>
                     </div>
-                    <h3 class="text-base font-semibold text-slate-800">Listening for incoming SMS...</h3>
-                    <p class="text-xs text-slate-500 max-w-sm mx-auto">Enter the number into <?= htmlspecialchars($order['service_name']) ?> now. We check the provider node every 3 seconds.</p>
+                    <div>
+                        <h3 class="text-base font-bold text-slate-800">Waiting for incoming SMS code...</h3>
+                        <p class="text-xs text-slate-500 max-w-sm mx-auto mt-1 leading-relaxed">
+                            Request the SMS verification on <?= htmlspecialchars($order['service_name']) ?> now. Our node checks for incoming carrier packets every 3 seconds.
+                        </p>
+                    </div>
                 </div>
             </template>
 
             <template x-if="otpCode">
-                <div class="space-y-3">
-                    <span class="text-xs font-bold text-emerald-800 uppercase tracking-widest block">SMS Verification Code Received</span>
-                    <div class="text-4xl sm:text-5xl font-extrabold font-mono tracking-widest text-emerald-700 tabular-nums py-2" x-text="otpCode"></div>
-                    <button 
-                        @click="copyText(otpCode)"
-                        class="px-5 py-2.5 text-xs font-bold text-white bg-emerald-600 hover:bg-emerald-700 rounded-lg shadow-sm transition-colors"
-                    >
-                        Copy OTP Code
-                    </button>
+                <div class="space-y-4 py-2">
+                    <div class="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-emerald-100 text-emerald-800 text-xs font-bold">
+                        <svg class="w-4 h-4 text-emerald-600" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="20 6 9 17 4 12"/></svg>
+                        <span>SMS Code Delivered Successfully</span>
+                    </div>
+
+                    <div class="text-5xl sm:text-6xl font-black font-mono tracking-widest text-emerald-700 tabular-nums py-2 select-all drop-shadow-xs" x-text="otpCode"></div>
+
+                    <div>
+                        <button 
+                            @click="copyText(otpCode, 'Verification code copied!')"
+                            class="px-6 py-3 text-xs font-bold text-white bg-emerald-600 hover:bg-emerald-700 rounded-xl shadow-md shadow-emerald-600/25 transition-all transform hover:-translate-y-0.5 inline-flex items-center gap-2"
+                        >
+                            <svg class="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect width="14" height="14" x="8" y="8" rx="2" ry="2"/><path d="M4 16c-1.1 0-2-.9-2-2V4c0-1.1.9-2 2-2h10c1.1 0 2 .9 2 2"/></svg>
+                            <span>Copy Verification Code</span>
+                        </button>
+                    </div>
                 </div>
             </template>
         </div>
 
-        <!-- Action / Cancellation & Refund -->
-        <div class="flex items-center justify-between pt-4 border-t border-slate-100">
-            <span class="text-xs text-slate-400">Order Cost: $<?= number_format((float)$order['price'], 2) ?></span>
+        <!-- Actions / Cancellation & Refund -->
+        <div class="flex items-center justify-between pt-4 border-t border-slate-100 text-xs">
+            <div class="text-slate-500">
+                Order Charge: <strong class="font-mono font-bold text-slate-900">$<?= number_format((float)$order['price'], 2) ?></strong>
+            </div>
 
             <template x-if="!otpCode && (status === 'ACTIVE' || status === 'WAITING')">
                 <button 
                     @click="cancelOrder()"
-                    class="px-4 py-2 text-xs font-semibold text-rose-600 bg-rose-50 hover:bg-rose-100 border border-rose-200 rounded-lg transition-colors"
+                    class="px-4 py-2 font-bold text-rose-600 bg-rose-50 hover:bg-rose-100 border border-rose-200 rounded-xl transition-all"
                 >
                     Cancel & Refund Balance
                 </button>
@@ -93,11 +134,18 @@
 
     </div>
 
-    <!-- Assurance Notice -->
-    <div class="text-xs text-slate-500 bg-white border border-slate-200 rounded-xl p-4 flex items-start gap-3 shadow-sm">
-        <svg class="w-5 h-5 text-brand-600 shrink-0 mt-0.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z"></path></svg>
+    <!-- Assurance & Money-back Notice Card -->
+    <div class="text-xs text-slate-600 bg-white border border-slate-200/80 rounded-2xl p-5 flex items-start gap-3.5 shadow-xs">
+        <div class="w-9 h-9 rounded-xl bg-brand-50 text-brand-600 flex items-center justify-center shrink-0">
+            <svg class="w-5 h-5 text-brand-600" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/>
+            </svg>
+        </div>
         <div>
-            <strong class="text-slate-800">100% Unused Number Protection:</strong> If no SMS arrives within the 15-minute countdown, the order automatically closes and the full purchase amount is refunded to your wallet ledger.
+            <strong class="text-slate-900 block font-bold">100% Unused Number Protection Guarantee:</strong>
+            <p class="text-slate-500 mt-0.5 leading-relaxed">
+                If no SMS arrives within the 15-minute countdown, the session automatically expires and the full purchase amount ($<?= number_format((float)$order['price'], 2) ?>) is immediately refunded back to your wallet ledger.
+            </p>
         </div>
     </div>
 
@@ -136,60 +184,50 @@ function orderLiveMonitor(orderId, initialStatus, initialOtp) {
             return `${m}:${s}`;
         },
 
+        copyText(text, msg) {
+            navigator.clipboard.writeText(text);
+            Swal.fire({
+                toast: true,
+                position: 'top-end',
+                icon: 'success',
+                title: msg || 'Copied to clipboard!',
+                showConfirmButton: false,
+                timer: 1500
+            });
+        },
+
         startPolling() {
             this.pollTimer = setInterval(async () => {
-                if (this.otpCode || this.status === 'CANCELLED' || this.status === 'EXPIRED') {
+                if (this.otpCode) {
                     clearInterval(this.pollTimer);
                     return;
                 }
-
                 try {
                     const res = await fetch(`/api/order/status?id=${this.orderId}`);
                     const data = await res.json();
-
                     if (data.success) {
-                        if (data.status === 'RECEIVED' && data.otp) {
-                            this.otpCode = data.otp;
-                            this.status = 'RECEIVED';
+                        this.status = data.status;
+                        if (data.otp_code) {
+                            this.otpCode = data.otp_code;
                             clearInterval(this.pollTimer);
                             Swal.fire({
                                 icon: 'success',
-                                title: 'OTP Received!',
-                                text: `Your verification code is: ${data.otp}`,
-                                confirmButtonColor: '#7c3aed'
+                                title: 'Code Received!',
+                                text: `Your verification code is: ${data.otp_code}`,
+                                confirmButtonColor: '#10b981'
                             });
-                        } else if (data.status === 'CANCELLED' || data.status === 'EXPIRED') {
-                            this.status = data.status;
-                            clearInterval(this.pollTimer);
                         }
                     }
                 } catch (e) {
-                    console.log('Polling retry...');
+                    // Silent retry on next interval
                 }
             }, 3000);
-        },
-
-        async copyText(text) {
-            try {
-                await navigator.clipboard.writeText(text);
-                Swal.fire({
-                    toast: true,
-                    position: 'top-end',
-                    icon: 'success',
-                    title: 'Copied to clipboard',
-                    showConfirmButton: false,
-                    timer: 1500
-                });
-            } catch (e) {
-                // Fallback prompt
-                prompt('Copy text:', text);
-            }
         },
 
         async cancelOrder() {
             const confirm = await Swal.fire({
                 title: 'Cancel this number?',
-                text: 'Your balance will be refunded immediately to your wallet.',
+                text: 'Order will be cancelled and the full price refunded to your wallet balance immediately.',
                 icon: 'warning',
                 showCancelButton: true,
                 confirmButtonColor: '#e11d48',
@@ -216,21 +254,21 @@ function orderLiveMonitor(orderId, initialStatus, initialOtp) {
                     Swal.fire({
                         icon: 'success',
                         title: 'Cancelled & Refunded',
-                        text: data.message,
+                        text: 'Your balance has been restored.',
                         confirmButtonColor: '#7c3aed'
                     });
                 } else {
                     Swal.fire({
                         icon: 'error',
-                        title: 'Cancellation Failed',
-                        text: data.message
+                        title: 'Error',
+                        text: data.message || 'Could not cancel order.'
                     });
                 }
-            } catch (err) {
+            } catch (e) {
                 Swal.fire({
                     icon: 'error',
-                    title: 'Error',
-                    text: 'Network connection failed.'
+                    title: 'Network Error',
+                    text: 'Unable to cancel order.'
                 });
             }
         }
