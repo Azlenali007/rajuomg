@@ -14,24 +14,15 @@
             <p class="text-xs text-slate-500">Configure catalog selling prices, apply bulk profit margins, delete records, and sync provider routes.</p>
         </div>
         
-        <!-- Top Quick Controls (Catalog Seed & Provider API Sync) -->
+        <!-- Top Quick Controls (Provider API Sync) -->
         <div class="flex flex-wrap items-center gap-2.5">
-            <button 
-                @click="importCatalog()" 
-                :disabled="loading"
-                class="px-3.5 py-2 text-xs font-bold text-slate-700 bg-white hover:bg-slate-50 border border-slate-300 rounded-xl shadow-xs transition-all flex items-center gap-1.5 disabled:opacity-50"
-            >
-                <svg class="w-4 h-4 text-emerald-600" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
-                <span>Import Standard Catalog</span>
-            </button>
-
             <button 
                 @click="syncFromProvider()" 
                 :disabled="loading"
-                class="px-3.5 py-2 text-xs font-bold text-white bg-brand-600 hover:bg-brand-700 rounded-xl shadow-xs transition-all flex items-center gap-1.5 disabled:opacity-50"
+                class="px-4 py-2 text-xs font-bold text-white bg-brand-600 hover:bg-brand-700 rounded-xl shadow-xs transition-all flex items-center gap-1.5 disabled:opacity-50"
             >
                 <svg class="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21.5 2v6h-6M21.34 15.57a10 10 0 1 1-.57-8.38l5.67-5.67"/></svg>
-                <span>Sync Provider API</span>
+                <span>Sync from Provider API</span>
             </button>
 
             <span class="text-xs font-mono font-bold text-slate-700 bg-slate-100 border border-slate-200 px-3 py-2 rounded-xl">
@@ -696,50 +687,11 @@ function adminServicesManager() {
             }
         },
 
-        async importCatalog() {
-            this.loading = true;
-            Swal.fire({
-                title: 'Importing Verified Catalog...',
-                text: 'Seeding 12 verified standard services and countries without overwriting custom pricing...',
-                allowOutsideClick: false,
-                didOpen: () => Swal.showLoading()
-            });
-
-            try {
-                const formData = new FormData();
-                formData.append('provider_id', 1);
-                formData.append('csrf_token', document.querySelector('meta[name="csrf-token"]').getAttribute('content'));
-
-                const res = await fetch('/admin/providers/import-catalog', {
-                    method: 'POST',
-                    body: formData
-                });
-                const data = await res.json();
-
-                if (data.success) {
-                    await Swal.fire({
-                        icon: 'success',
-                        title: 'Catalog Synchronized',
-                        text: data.message,
-                        timer: 2000,
-                        showConfirmButton: false
-                    });
-                    window.location.reload();
-                } else {
-                    Swal.fire({ icon: 'error', title: 'Import Failed', text: data.message });
-                }
-            } catch (err) {
-                Swal.fire({ icon: 'error', title: 'Network Error', text: 'Server communication error.' });
-            } finally {
-                this.loading = false;
-            }
-        },
-
         async syncFromProvider() {
             this.loading = true;
             Swal.fire({
-                title: 'Syncing from Provider API...',
-                text: 'Calling upstream provider and updating active services and stock...',
+                title: 'Connecting to Provider API...',
+                text: 'Fetching real countries, services, and live stock from upstream provider endpoint...',
                 allowOutsideClick: false,
                 didOpen: () => Swal.showLoading()
             });
@@ -747,7 +699,6 @@ function adminServicesManager() {
             try {
                 const formData = new FormData();
                 formData.append('provider_id', 1);
-                formData.append('country_code', 'in');
                 formData.append('csrf_token', document.querySelector('meta[name="csrf-token"]').getAttribute('content'));
 
                 const res = await fetch('/admin/providers/sync', {
@@ -761,15 +712,15 @@ function adminServicesManager() {
                         icon: 'success',
                         title: 'Provider Sync Complete',
                         text: data.message,
-                        timer: 2000,
+                        timer: 2200,
                         showConfirmButton: false
                     });
                     window.location.reload();
                 } else {
-                    Swal.fire({ icon: 'warning', title: 'Provider Sync Alert', text: data.message });
+                    Swal.fire({ icon: 'warning', title: 'Provider Sync Notice', text: data.message });
                 }
             } catch (err) {
-                Swal.fire({ icon: 'error', title: 'Network Error', text: 'Server communication error.' });
+                Swal.fire({ icon: 'error', title: 'Network Error', text: 'Server communication error during API sync.' });
             } finally {
                 this.loading = false;
             }

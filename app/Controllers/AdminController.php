@@ -218,7 +218,7 @@ class AdminController
     }
 
     /**
-     * Trigger Country & Service Sync
+     * Trigger Real Provider API Synchronization (Countries & Services)
      */
     public function syncNow(): void
     {
@@ -226,27 +226,34 @@ class AdminController
         header('Content-Type: application/json');
 
         $providerId = (int)($_POST['provider_id'] ?? 1);
-        $countryCode = trim((string)($_POST['country_code'] ?? 'in'));
+        $countryCode = isset($_POST['country_code']) && trim((string)$_POST['country_code']) !== '' ? trim((string)$_POST['country_code']) : null;
 
+        // 1. Sync countries directly from provider API
         $cResult = $this->syncService->syncCountries($providerId);
-        $sResult = $this->syncService->syncServices($providerId, $countryCode);
 
-        $hasError = !$cResult['success'] || !$sResult['success'];
-        $messages = [];
-        if ($cResult['success']) {
-            $messages[] = $cResult['message'];
-        } else {
-            $messages[] = "Countries: " . $cResult['message'];
+        // If provider authentication or connection fails, halt and report real error immediately
+        if (!$cResult['success']) {
+            echo json_encode([
+                'success' => false,
+                'imported_countries' => 0,
+                'imported_services' => 0,
+                'message' => 'Country sync failed: ' . $cResult['message']
+            ]);
+            exit;
         }
 
+        // 2. Sync services for specified country or all active countries from provider API
+        $sResult = $this->syncService->syncServices($providerId, $countryCode);
+
+        $messages = [$cResult['message']];
         if ($sResult['success']) {
             $messages[] = $sResult['message'];
         } else {
-            $messages[] = "Services: " . $sResult['message'];
+            $messages[] = 'Service sync error: ' . $sResult['message'];
         }
 
         echo json_encode([
-            'success' => !$hasError,
+            'success' => $sResult['success'],
             'imported_countries' => $cResult['count'] ?? 0,
             'imported_services' => $sResult['count'] ?? 0,
             'message' => implode(' | ', $messages)
@@ -282,21 +289,6 @@ class AdminController
 
         Session::flash('success', 'Provider settings updated successfully.');
         header('Location: /admin/providers');
-        exit;
-    }
-
-    /**
-     * Import Standard Verified Catalog (Fallback / Initial Seed)
-     */
-    public function importCatalog(): void
-    {
-        Auth::requireSuperAdmin();
-        header('Content-Type: application/json');
-
-        $providerId = (int)($_POST['provider_id'] ?? 1);
-        $result = $this->syncService->importStandardCatalog($providerId);
-
-        echo json_encode($result);
         exit;
     }
 

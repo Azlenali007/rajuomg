@@ -17,7 +17,6 @@ Router::get('/admin/providers.php', [AdminController::class, 'providers']);
 Router::post('/admin/providers/test', [AdminController::class, 'testProvider']);
 Router::post('/admin/providers/sync', [AdminController::class, 'syncNow']);
 Router::post('/admin/providers/update', [AdminController::class, 'updateProvider']);
-Router::post('/admin/providers/import-catalog', [AdminController::class, 'importCatalog']);
 
 Router::get('/admin/services', [AdminController::class, 'services']);
 Router::get('/admin/services.php', [AdminController::class, 'services']);

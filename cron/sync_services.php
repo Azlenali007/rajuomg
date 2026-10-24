@@ -30,7 +30,7 @@ echo "[" . date('Y-m-d H:i:s') . "] Starting catalog synchronization...\n";
 $providers = $pdo->query("SELECT id FROM providers WHERE is_active = 1")->fetchAll();
 foreach ($providers as $p) {
     $c = $syncService->syncCountries((int)$p['id']);
-    $s = $syncService->syncServices((int)$p['id'], 'in');
+    $s = $syncService->syncServices((int)$p['id'], null);
     echo "  ✔ Provider #{$p['id']}: {$c['message']} | {$s['message']}\n";
 }
 

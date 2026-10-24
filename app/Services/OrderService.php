@@ -65,15 +65,19 @@ class OrderService
         $mapping = $pStmt->fetch();
 
         if (!$mapping) {
-            // Fallback: look up primary active provider
+            // Look up primary active provider
             $fallbackP = $this->pdo->prepare("SELECT * FROM providers WHERE is_active = 1 LIMIT 1");
             $fallbackP->execute();
             $provider = $fallbackP->fetch();
             if (!$provider) {
                 return ['success' => false, 'message' => 'No active SMS provider configured in system.'];
             }
-            $providerCost = (float)$service['custom_price'] * 0.7; // 30% margin default
-            $serverName = 'Primary Cloud Node';
+            $chkService = $this->pdo->prepare("SELECT provider_service_code, provider_cost FROM provider_services WHERE service_id = ? AND provider_id = ? LIMIT 1");
+            $chkService->execute([$serviceId, $provider['id']]);
+            $existingServiceMap = $chkService->fetch();
+
+            $providerServiceCode = $existingServiceMap ? $existingServiceMap['provider_service_code'] : $service['service_code'];
+            $providerCost = $existingServiceMap ? (float)$existingServiceMap['provider_cost'] : round((float)$service['custom_price'] * 0.7, 4);
         } else {
             $provider = [
                 'id' => $mapping['p_id'],
@@ -81,8 +85,8 @@ class OrderService
                 'api_key' => $mapping['api_key'],
                 'code' => $mapping['p_code']
             ];
+            $providerServiceCode = !empty($mapping['provider_service_code']) ? $mapping['provider_service_code'] : $service['service_code'];
             $providerCost = (float)$mapping['provider_cost'];
-            $serverName = $mapping['server_name'] ?? 'Primary Cloud Node';
         }
 
         $userPrice = (float)$service['custom_price'];
@@ -94,9 +98,9 @@ class OrderService
             return ['success' => false, 'message' => $deduction['message']];
         }
 
-        // 5. Call Provider API to acquire number
+        // 5. Call Provider API to acquire number using authentic provider identifiers
         $providerInstance = new OtpDoctorProvider($provider['api_url'], $provider['api_key'], $this->pdo, (int)$provider['id']);
-        $providerResponse = $providerInstance->getNumber($service['service_code'], $countryData['country_code']);
+        $providerResponse = $providerInstance->getNumber($providerServiceCode, (string)$countryData['country_code']);
 
         if (!$providerResponse['success']) {
             // Provider failed: automatically refund wallet immediately

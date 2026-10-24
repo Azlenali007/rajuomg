@@ -117,7 +117,8 @@ class OtpDoctorProvider implements ProviderInterface
     }
 
     /**
-     * Retrieve available countries (Active and validated only)
+     * Retrieve available countries directly from provider API
+     * Parses real provider country identifiers, names, and dial prefixes.
      */
     public function getCountries(): array
     {
@@ -144,17 +145,24 @@ class OtpDoctorProvider implements ProviderInterface
                 if (isset($item['enabled']) && ($item['enabled'] === 0 || $item['enabled'] === '0' || $item['enabled'] === false)) continue;
                 if (isset($item['is_active']) && ($item['is_active'] === 0 || $item['is_active'] === '0' || $item['is_active'] === false)) continue;
 
-                $code = strtolower(trim((string)($item['code'] ?? $item['iso'] ?? $item['id'] ?? $key)));
-                $name = trim((string)($item['name'] ?? $item['eng'] ?? $item['rus'] ?? ''));
-                if (empty($name)) {
-                    $name = 'Country ' . strtoupper($code);
+                // Preserve original provider country identifier (prefer id or key used in API requests)
+                $code = '';
+                if (isset($item['id']) && $item['id'] !== '') {
+                    $code = (string)$item['id'];
+                } elseif (is_numeric($key) || !empty($key)) {
+                    $code = (string)$key;
+                } elseif (!empty($item['code'])) {
+                    $code = (string)$item['code'];
                 }
-                $dial = isset($item['prefix']) ? '+' . ltrim((string)$item['prefix'], '+') : null;
+                $code = trim($code);
 
-                // Validate required fields
+                // Preserve real country name from provider
+                $name = trim((string)($item['eng'] ?? $item['name'] ?? $item['rus'] ?? ''));
                 if (empty($code) || empty($name)) {
                     continue;
                 }
+
+                $dial = isset($item['prefix']) ? '+' . ltrim((string)$item['prefix'], '+') : null;
 
                 $countries[] = [
                     'code' => $code,
@@ -163,14 +171,15 @@ class OtpDoctorProvider implements ProviderInterface
                     'is_active' => 1
                 ];
             }
-            return ['success' => true, 'countries' => $countries, 'message' => 'Countries loaded'];
+            return ['success' => true, 'countries' => $countries, 'message' => 'Countries loaded from provider'];
         }
 
         return ['success' => false, 'countries' => [], 'message' => 'Unable to parse countries from provider: ' . substr($body, 0, 80)];
     }
 
     /**
-     * Retrieve services for a country (Active and available services only)
+     * Retrieve services for a country directly from provider API
+     * Parses real provider service codes, names, costs, and authentic stock numbers.
      */
     public function getServices(string $countryCode): array
     {
@@ -192,7 +201,7 @@ class OtpDoctorProvider implements ProviderInterface
         $json = json_decode($body, true);
         if (json_last_error() === JSON_ERROR_NONE && is_array($json)) {
             $serviceItems = $json;
-            // Handle nested country object responses (e.g. {"in": {...}} or {"0": {...}})
+            // Handle nested country object responses (e.g. {"in": {...}} or {"0": {...}} or {"22": {...}})
             if (isset($json[$countryCode]) && is_array($json[$countryCode])) {
                 $serviceItems = $json[$countryCode];
             } elseif (count($json) === 1 && is_array(reset($json))) {
@@ -203,8 +212,16 @@ class OtpDoctorProvider implements ProviderInterface
             }
 
             $services = [];
-            foreach ($serviceItems as $code => $data) {
-                $serviceCode = strtolower(trim((string)$code));
+            foreach ($serviceItems as $key => $data) {
+                // Determine real service code
+                $serviceCode = '';
+                if (is_array($data)) {
+                    $serviceCode = (string)($data['service_code'] ?? $data['code'] ?? $data['service'] ?? (!is_numeric($key) ? $key : ''));
+                } elseif (!is_numeric($key)) {
+                    $serviceCode = (string)$key;
+                }
+
+                $serviceCode = strtolower(trim($serviceCode));
                 if (empty($serviceCode)) continue;
 
                 // Filter out inactive / disabled / discontinued services based on provider fields
@@ -228,27 +245,48 @@ class OtpDoctorProvider implements ProviderInterface
                     continue;
                 }
 
-                $name = is_array($data) ? ($data['name'] ?? strtoupper($serviceCode)) : strtoupper($serviceCode);
-                $cost = is_array($data) ? (float)($data['cost'] ?? $data['price'] ?? 0.0) : (float)$data;
-                $stock = is_array($data) ? (int)($data['count'] ?? $data['quantity'] ?? $data['stock'] ?? 10) : 10;
+                // Authentic service name
+                $name = '';
+                if (is_array($data) && !empty($data['name'])) {
+                    $name = trim((string)$data['name']);
+                }
+                if (empty($name)) {
+                    $name = strtoupper($serviceCode);
+                }
 
-                // Validate code length and name
-                if (strlen($serviceCode) < 1 || strlen($serviceCode) > 50) {
-                    continue;
+                // Authentic provider cost
+                $cost = 0.0;
+                if (is_array($data)) {
+                    $cost = (float)($data['cost'] ?? $data['price'] ?? 0.0);
+                } elseif (is_numeric($data)) {
+                    $cost = (float)$data;
+                }
+
+                // Authentic stock count if supplied by provider
+                $stock = null;
+                if (is_array($data)) {
+                    if (isset($data['count'])) {
+                        $stock = (int)$data['count'];
+                    } elseif (isset($data['quantity'])) {
+                        $stock = (int)$data['quantity'];
+                    } elseif (isset($data['stock'])) {
+                        $stock = (int)$data['stock'];
+                    }
                 }
 
                 $services[] = [
                     'service_code' => $serviceCode,
-                    'name' => trim((string)$name),
-                    'cost' => $cost,
-                    'stock' => max(0, $stock),
+                    'name' => $name,
+                    'cost' => max(0.0, $cost),
+                    'stock' => $stock,
                     'is_active' => 1
                 ];
             }
-            return ['success' => true, 'services' => $services, 'message' => 'Services loaded'];
+            return ['success' => true, 'services' => $services, 'message' => 'Services loaded from provider'];
         }
 
         return ['success' => false, 'services' => [], 'message' => 'Unable to parse services data: ' . substr($body, 0, 80)];
+    }
     }
 
     /**
