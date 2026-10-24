@@ -1,0 +1,38 @@
+# OTP Doctor - Root .htaccess Configuration
+# Protects private application folders and routes traffic to public/
+
+DirectoryIndex index.php public/index.php
+
+<IfModule mod_rewrite.c>
+    RewriteEngine On
+    RewriteBase /
+
+    # 1. Protect private server-side directories
+    RewriteRule ^(app|config|cron|database|modules|resources|routes|storage|tests|websocket)/ - [F,L]
+
+    # 2. Protect sensitive environment, package, and log files
+    RewriteRule ^(\.env|\.gitignore|metadata\.json|package\.json|package-lock\.json|tsconfig\.json|vite\.config\.ts|README\.md) - [F,L]
+    <FilesMatch "^\.|\.(lock|env|sql|log|md|json)$">
+        <IfModule mod_authz_core.c>
+            Require all denied
+        </IfModule>
+        <IfModule !mod_authz_core.c>
+            Order allow,deny
+            Deny from all
+        </IfModule>
+    </FilesMatch>
+
+    # 3. Route /install or /install/ to public/install/index.php
+    RewriteRule ^install/?$ public/install/index.php [QSA,L]
+    RewriteRule ^install/(.*)$ public/install/$1 [QSA,L]
+
+    # 4. Route static assets from public/assets
+    RewriteRule ^assets/(.*)$ public/assets/$1 [L]
+
+    # 5. Route all non-existing files to public/index.php
+    RewriteCond %{REQUEST_FILENAME} !-f
+    RewriteCond %{REQUEST_FILENAME} !-d
+    RewriteRule ^(.*)$ public/index.php [QSA,L]
+</IfModule>
+
+Options -Indexes

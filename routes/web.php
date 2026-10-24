@@ -22,9 +22,15 @@ Router::get('/order', [OrderController::class, 'showOrder']);
 Router::get('/wallet', [WalletController::class, 'showWallet']);
 Router::post('/wallet/manual', [WalletController::class, 'submitManual']);
 
-// Web-Based Installation Wizard route
-Router::get('/install', function() {
+// Web-Based Installation Wizard routes (handles GET, POST, trailing slash, and index.php)
+$installHandler = function() {
     require_once dirname(__DIR__) . '/public/install/index.php';
     exit;
-});
+};
 
+Router::get('/install', $installHandler);
+Router::post('/install', $installHandler);
+Router::get('/install/', $installHandler);
+Router::post('/install/', $installHandler);
+Router::get('/install/index.php', $installHandler);
+Router::post('/install/index.php', $installHandler);

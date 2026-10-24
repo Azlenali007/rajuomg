@@ -33,8 +33,8 @@ class Router
             exit;
         }
 
-        // Automatic CSRF check for state-changing web POST requests (exclude webhooks)
-        if ($method === 'POST' && !str_starts_with($path, '/api/webhook')) {
+        // Automatic CSRF check for state-changing web POST requests (exclude webhooks and installer)
+        if ($method === 'POST' && !str_starts_with($path, '/api/webhook') && !str_starts_with($path, '/install')) {
             $token = $_POST['csrf_token'] ?? $_SERVER['HTTP_X_CSRF_TOKEN'] ?? null;
             if (!CSRF::validate($token)) {
                 http_response_code(419);

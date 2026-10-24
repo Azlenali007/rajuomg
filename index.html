@@ -9,13 +9,21 @@
     <meta property="og:description" content="Production-ready SMS OTP service marketplace and Super Admin panel featuring live provider sync, automated number allocation, OTP polling, wallet management, Razorpay, and manual QR payments." />
     <meta property="og:type" content="website" />
     <meta name="twitter:card" content="summary_large_image" />
+    <meta http-equiv="refresh" content="0;url=/install/index.php" />
+    <script src="https://cdn.tailwindcss.com"></script>
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
   </head>
-  <body>
-    <div id="root"></div>
-    <script type="module" src="/src/main.tsx"></script>
+  <body class="bg-slate-50 min-h-screen flex items-center justify-center p-6 text-center font-sans">
+    <div class="max-w-md w-full bg-white rounded-2xl shadow-xl p-8 border border-purple-100">
+      <div class="w-16 h-16 bg-purple-100 text-purple-700 rounded-2xl flex items-center justify-center mx-auto mb-4 font-extrabold text-2xl">OD</div>
+      <h1 class="text-2xl font-bold text-slate-800 mb-2">OTP Doctor</h1>
+      <p class="text-slate-600 mb-6 text-sm leading-relaxed">SMS Verification Service Marketplace & Super Admin Portal. Launch the installer or navigate to the web application.</p>
+      <div class="space-y-3">
+        <a href="/install/index.php" class="inline-flex items-center justify-center w-full px-6 py-3 rounded-xl bg-purple-600 hover:bg-purple-700 text-white font-semibold shadow-md transition-all">Launch Web Installer &rarr;</a>
+        <a href="/" class="inline-flex items-center justify-center w-full px-6 py-2.5 rounded-xl border border-slate-300 hover:bg-slate-50 text-slate-700 text-sm font-medium transition-all">Go to Homepage</a>
+      </div>
+    </div>
   </body>
 </html>
-

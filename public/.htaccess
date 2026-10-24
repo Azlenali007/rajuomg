@@ -1,14 +1,29 @@
+# OTP Doctor - Public .htaccess Configuration
+DirectoryIndex index.php index.html
+
 <IfModule mod_rewrite.c>
     RewriteEngine On
+    RewriteBase /
+
+    # Route /install and /install/ directly to the installer entry point
+    RewriteRule ^install/?$ install/index.php [QSA,L]
+    RewriteRule ^install/index\.php$ install/index.php [QSA,L]
+
+    # Allow existing files and directories to be served directly
     RewriteCond %{REQUEST_FILENAME} !-f
     RewriteCond %{REQUEST_FILENAME} !-d
     RewriteRule ^ index.php [QSA,L]
 </IfModule>
 
-# Deny access to sensitive files
-<FilesMatch "^\.">
-    Order allow,deny
-    Deny from all
+# Deny access to sensitive files and hidden files
+<FilesMatch "^\.|\.(lock|env|sql|log|md|json)$">
+    <IfModule mod_authz_core.c>
+        Require all denied
+    </IfModule>
+    <IfModule !mod_authz_core.c>
+        Order allow,deny
+        Deny from all
+    </IfModule>
 </FilesMatch>
 
 Options -Indexes
