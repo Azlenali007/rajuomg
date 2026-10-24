@@ -134,7 +134,7 @@
 
     </div>
 
-    <!-- Assurance & Money-back Notice Card -->
+    <!-- Session Details & Cancellation Notice Card -->
     <div class="text-xs text-slate-600 bg-white border border-slate-200/80 rounded-2xl p-5 flex items-start gap-3.5 shadow-xs">
         <div class="w-9 h-9 rounded-xl bg-brand-50 text-brand-600 flex items-center justify-center shrink-0">
             <svg class="w-5 h-5 text-brand-600" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
@@ -142,9 +142,9 @@
             </svg>
         </div>
         <div>
-            <strong class="text-slate-900 block font-bold">100% Unused Number Protection Guarantee:</strong>
+            <strong class="text-slate-900 block font-bold">Verification Session & Auto-Expiry Policy:</strong>
             <p class="text-slate-500 mt-0.5 leading-relaxed">
-                If no SMS arrives within the 15-minute countdown, the session automatically expires and the full purchase amount ($<?= number_format((float)$order['price'], 2) ?>) is immediately refunded back to your wallet ledger.
+                If no SMS code arrives before the 15-minute timer elapses, you can cancel the request at any time or let it auto-expire. The allocated amount ($<?= number_format((float)$order['price'], 2) ?>) is returned to your account balance.
             </p>
         </div>
     </div>

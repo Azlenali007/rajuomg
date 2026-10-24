@@ -6,10 +6,17 @@
     --brand-dark: #0f172a;
 }
 
+html {
+    overflow-x: hidden;
+    max-width: 100%;
+}
+
 body {
     font-family: 'Plus Jakarta Sans', system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
     background-color: #f8fafc;
     color: #1e293b;
+    overflow-x: hidden;
+    max-width: 100%;
 }
 
 .font-mono, pre, code {

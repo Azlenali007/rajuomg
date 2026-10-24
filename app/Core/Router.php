@@ -25,7 +25,8 @@ class Router
         $parsedUrl = parse_url($uri, PHP_URL_PATH) ?: '/';
         $path = rtrim($parsedUrl, '/') ?: '/';
 
-        $handler = self::$routes[$method][$path] ?? null;
+        $lookupMethod = ($method === 'HEAD') ? 'GET' : $method;
+        $handler = self::$routes[$lookupMethod][$path] ?? null;
 
         if (!$handler) {
             http_response_code(404);

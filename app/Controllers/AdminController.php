@@ -226,15 +226,77 @@ class AdminController
         header('Content-Type: application/json');
 
         $providerId = (int)($_POST['provider_id'] ?? 1);
-        $type = $_POST['type'] ?? 'all';
+        $countryCode = trim((string)($_POST['country_code'] ?? 'in'));
 
         $cResult = $this->syncService->syncCountries($providerId);
-        $sResult = $this->syncService->syncServices($providerId, 'in');
+        $sResult = $this->syncService->syncServices($providerId, $countryCode);
+
+        $hasError = !$cResult['success'] || !$sResult['success'];
+        $messages = [];
+        if ($cResult['success']) {
+            $messages[] = $cResult['message'];
+        } else {
+            $messages[] = "Countries: " . $cResult['message'];
+        }
+
+        if ($sResult['success']) {
+            $messages[] = $sResult['message'];
+        } else {
+            $messages[] = "Services: " . $sResult['message'];
+        }
 
         echo json_encode([
-            'success' => true,
-            'message' => "Sync complete: {$cResult['message']} | {$sResult['message']}"
+            'success' => !$hasError,
+            'imported_countries' => $cResult['count'] ?? 0,
+            'imported_services' => $sResult['count'] ?? 0,
+            'message' => implode(' | ', $messages)
         ]);
+        exit;
+    }
+
+    /**
+     * Update Provider Configuration (API URL & Key)
+     */
+    public function updateProvider(): void
+    {
+        Auth::requireSuperAdmin();
+
+        $providerId = (int)($_POST['provider_id'] ?? 1);
+        $name = trim((string)($_POST['name'] ?? ''));
+        $apiUrl = trim((string)($_POST['api_url'] ?? ''));
+        $apiKey = trim((string)($_POST['api_key'] ?? ''));
+
+        if (empty($name) || empty($apiUrl)) {
+            Session::flash('error', 'Provider name and API URL are required.');
+            header('Location: /admin/providers');
+            exit;
+        }
+
+        if (!empty($apiKey)) {
+            $stmt = $this->pdo->prepare("UPDATE providers SET name = ?, api_url = ?, api_key = ? WHERE id = ?");
+            $stmt->execute([$name, $apiUrl, $apiKey, $providerId]);
+        } else {
+            $stmt = $this->pdo->prepare("UPDATE providers SET name = ?, api_url = ? WHERE id = ?");
+            $stmt->execute([$name, $apiUrl, $providerId]);
+        }
+
+        Session::flash('success', 'Provider settings updated successfully.');
+        header('Location: /admin/providers');
+        exit;
+    }
+
+    /**
+     * Import Standard Verified Catalog (Fallback / Initial Seed)
+     */
+    public function importCatalog(): void
+    {
+        Auth::requireSuperAdmin();
+        header('Content-Type: application/json');
+
+        $providerId = (int)($_POST['provider_id'] ?? 1);
+        $result = $this->syncService->importStandardCatalog($providerId);
+
+        echo json_encode($result);
         exit;
     }
 

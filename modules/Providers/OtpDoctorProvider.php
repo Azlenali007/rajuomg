@@ -26,6 +26,39 @@ class OtpDoctorProvider implements ProviderInterface
     }
 
     /**
+     * Map provider error codes to descriptive human-readable explanations
+     */
+    protected function parseApiError(string $body): ?string
+    {
+        $body = trim($body);
+        if ($body === 'BAD_KEY') {
+            return 'Provider rejected the API Key (BAD_KEY). Please update the API key in Super Admin > Provider API settings.';
+        }
+        if ($body === 'NO_KEY') {
+            return 'Provider API Key is missing (NO_KEY).';
+        }
+        if ($body === 'BAD_ACTION') {
+            return 'Provider rejected the action command (BAD_ACTION).';
+        }
+        if ($body === 'BAD_SERVICE') {
+            return 'Requested service code is not supported by the provider (BAD_SERVICE).';
+        }
+        if ($body === 'BAD_COUNTRY') {
+            return 'Requested country code is not supported by the provider (BAD_COUNTRY).';
+        }
+        if ($body === 'ERROR_SQL') {
+            return 'Provider upstream database error (ERROR_SQL).';
+        }
+        if (str_starts_with($body, 'NO_NUMBERS')) {
+            return 'No virtual numbers currently available from provider for this service.';
+        }
+        if (str_starts_with($body, 'NO_BALANCE')) {
+            return 'Provider account balance is depleted (NO_BALANCE). Please top-up provider account.';
+        }
+        return null;
+    }
+
+    /**
      * Retrieve provider balance
      */
     public function getBalance(): array
@@ -36,12 +69,22 @@ class OtpDoctorProvider implements ProviderInterface
             return [
                 'success' => false,
                 'balance' => 0.0,
-                'currency' => 'RUB',
-                'message' => $response['error'] ?? 'Failed to reach OTP Doctor'
+                'currency' => 'USD',
+                'message' => $response['error'] ?? 'Failed to reach OTP provider endpoint'
             ];
         }
 
-        $body = trim($response['body']);
+        $body = trim((string)($response['body'] ?? ''));
+        $apiErr = $this->parseApiError($body);
+        if ($apiErr) {
+            return [
+                'success' => false,
+                'balance' => 0.0,
+                'currency' => 'USD',
+                'message' => $apiErr
+            ];
+        }
+
         // Response format is usually: ACCESS_BALANCE:145.20 or JSON
         if (str_starts_with($body, 'ACCESS_BALANCE:')) {
             $parts = explode(':', $body);
@@ -49,7 +92,7 @@ class OtpDoctorProvider implements ProviderInterface
             return [
                 'success' => true,
                 'balance' => $balance,
-                'currency' => 'RUB',
+                'currency' => 'USD',
                 'raw' => $body
             ];
         }
@@ -60,7 +103,7 @@ class OtpDoctorProvider implements ProviderInterface
             return [
                 'success' => true,
                 'balance' => (float)$json['balance'],
-                'currency' => $json['currency'] ?? 'RUB',
+                'currency' => $json['currency'] ?? 'USD',
                 'raw' => $json
             ];
         }
@@ -68,7 +111,7 @@ class OtpDoctorProvider implements ProviderInterface
         return [
             'success' => false,
             'balance' => 0.0,
-            'currency' => 'RUB',
+            'currency' => 'USD',
             'message' => "Unexpected provider response: " . substr($body, 0, 80)
         ];
     }
@@ -80,25 +123,33 @@ class OtpDoctorProvider implements ProviderInterface
     {
         $response = $this->sendRequest(['action' => 'getCountries']);
         if (!$response['success']) {
-            return ['success' => false, 'countries' => [], 'message' => $response['error'] ?? 'API error'];
+            return ['success' => false, 'countries' => [], 'message' => $response['error'] ?? 'API connection error'];
         }
 
-        $body = trim($response['body']);
-        $json = json_decode($body, true);
+        $body = trim((string)($response['body'] ?? ''));
+        $apiErr = $this->parseApiError($body);
+        if ($apiErr) {
+            return ['success' => false, 'countries' => [], 'message' => $apiErr];
+        }
 
+        $json = json_decode($body, true);
         if (json_last_error() === JSON_ERROR_NONE && is_array($json)) {
             $countries = [];
             foreach ($json as $key => $item) {
+                if (!is_array($item)) continue;
+                $code = strtolower((string)($item['code'] ?? $item['iso'] ?? $item['id'] ?? $key));
+                $name = (string)($item['name'] ?? $item['eng'] ?? $item['rus'] ?? 'Country ' . $key);
+                $dial = isset($item['prefix']) ? '+' . ltrim((string)$item['prefix'], '+') : null;
                 $countries[] = [
-                    'code' => (string)($item['id'] ?? $key),
-                    'name' => (string)($item['name'] ?? $item['eng'] ?? $item['rus'] ?? 'Country ' . $key),
-                    'dial_code' => isset($item['prefix']) ? '+' . $item['prefix'] : null
+                    'code' => $code,
+                    'name' => $name,
+                    'dial_code' => $dial
                 ];
             }
             return ['success' => true, 'countries' => $countries, 'message' => 'Countries loaded'];
         }
 
-        return ['success' => false, 'countries' => [], 'message' => 'Unable to parse countries from provider'];
+        return ['success' => false, 'countries' => [], 'message' => 'Unable to parse countries from provider: ' . substr($body, 0, 80)];
     }
 
     /**
@@ -112,18 +163,22 @@ class OtpDoctorProvider implements ProviderInterface
         ]);
 
         if (!$response['success']) {
-            return ['success' => false, 'services' => [], 'message' => $response['error'] ?? 'API error'];
+            return ['success' => false, 'services' => [], 'message' => $response['error'] ?? 'API connection error'];
         }
 
-        $body = trim($response['body']);
-        $json = json_decode($body, true);
+        $body = trim((string)($response['body'] ?? ''));
+        $apiErr = $this->parseApiError($body);
+        if ($apiErr) {
+            return ['success' => false, 'services' => [], 'message' => $apiErr];
+        }
 
+        $json = json_decode($body, true);
         if (json_last_error() === JSON_ERROR_NONE && is_array($json)) {
             $services = [];
             foreach ($json as $code => $data) {
                 $services[] = [
-                    'service_code' => (string)$code,
-                    'name' => is_array($data) ? ($data['name'] ?? strtoupper($code)) : strtoupper($code),
+                    'service_code' => strtolower((string)$code),
+                    'name' => is_array($data) ? ($data['name'] ?? strtoupper((string)$code)) : strtoupper((string)$code),
                     'cost' => is_array($data) ? (float)($data['cost'] ?? $data['price'] ?? 0.0) : (float)$data,
                     'stock' => is_array($data) ? (int)($data['count'] ?? $data['quantity'] ?? 0) : 10,
                 ];
@@ -131,7 +186,7 @@ class OtpDoctorProvider implements ProviderInterface
             return ['success' => true, 'services' => $services, 'message' => 'Services loaded'];
         }
 
-        return ['success' => false, 'services' => [], 'message' => 'Unable to parse services data'];
+        return ['success' => false, 'services' => [], 'message' => 'Unable to parse services data: ' . substr($body, 0, 80)];
     }
 
     /**

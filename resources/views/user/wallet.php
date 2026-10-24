@@ -9,7 +9,7 @@
             <div class="space-y-2">
                 <div class="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-emerald-500/20 border border-emerald-400/30 text-emerald-300 text-xs font-semibold">
                     <span class="w-2 h-2 rounded-full bg-emerald-400 animate-pulse"></span>
-                    <span>Atomic Ledger Guaranteed</span>
+                    <span>Live Account Balance</span>
                 </div>
                 <div class="text-xs uppercase tracking-wider text-slate-400 font-semibold">Current Available Balance</div>
                 <div class="text-4xl sm:text-5xl font-black font-mono tabular-nums text-white flex items-baseline gap-1">
@@ -18,7 +18,7 @@
                     <span class="text-xs font-mono text-slate-400 ml-2 font-normal">USD</span>
                 </div>
                 <p class="text-xs text-slate-300 max-w-md">
-                    Instantly deducts when purchasing verification numbers. Automatic 100% refund rollback if SMS does not arrive within 15 minutes.
+                    Funds are deducted when allocating a number. If no verification code is received before cancellation or expiration, the amount is returned to your balance.
                 </p>
             </div>
 
