@@ -33,6 +33,14 @@ class Database
                     $config['options']
                 );
             } catch (PDOException $e) {
+                $sqliteFile = dirname(__DIR__, 2) . '/storage/database.sqlite';
+                if (file_exists($sqliteFile)) {
+                    self::$instance = new PDO('sqlite:' . $sqliteFile, null, null, [
+                        PDO::ATTR_ERRMODE => PDO::ERRMODE_EXCEPTION,
+                        PDO::ATTR_DEFAULT_FETCH_MODE => PDO::FETCH_ASSOC,
+                    ]);
+                    return self::$instance;
+                }
                 Logger::error("Database Connection Failure: " . $e->getMessage());
                 if (getenv('APP_DEBUG') === 'true') {
                     throw new RuntimeException("Database error: " . $e->getMessage());

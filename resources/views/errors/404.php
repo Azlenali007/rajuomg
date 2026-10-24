@@ -13,9 +13,12 @@
         </div>
         <h1 class="text-2xl font-bold tracking-tight text-slate-900">Page not found</h1>
         <p class="text-sm text-slate-500">The requested endpoint or resource does not exist or has been moved.</p>
-        <div class="pt-4">
-            <a href="/dashboard" class="inline-flex items-center justify-center px-4 py-2 text-sm font-medium text-white bg-purple-600 hover:bg-purple-700 rounded-lg shadow-sm transition-colors">
+        <div class="pt-4 flex flex-col sm:flex-row items-center justify-center gap-3">
+            <a href="/" class="w-full sm:w-auto inline-flex items-center justify-center px-5 py-2.5 text-sm font-medium text-white bg-purple-600 hover:bg-purple-700 rounded-lg shadow-sm transition-colors">
                 Return to Dashboard
+            </a>
+            <a href="/login" class="w-full sm:w-auto inline-flex items-center justify-center px-4 py-2.5 text-sm font-medium text-slate-700 bg-white border border-slate-300 hover:bg-slate-50 rounded-lg shadow-sm transition-colors">
+                Sign In
             </a>
         </div>
     </div>

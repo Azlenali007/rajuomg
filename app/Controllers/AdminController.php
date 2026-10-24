@@ -124,7 +124,7 @@ class AdminController
             Session::flash('success', "User account status changed to {$newStatus}.");
         }
 
-        header('Location: /admin/users.php');
+        header('Location: /admin/users');
         exit;
     }
 
@@ -147,7 +147,7 @@ class AdminController
             Session::flash('error', $result['message']);
         }
 
-        header('Location: /admin/users.php');
+        header('Location: /admin/users');
         exit;
     }
 
@@ -254,7 +254,7 @@ class AdminController
         $stmt->execute([$price, $isActive, $serviceId]);
 
         Session::flash('success', 'Service updated successfully.');
-        header('Location: /admin/services.php');
+        header('Location: /admin/services');
         exit;
     }
 
@@ -336,7 +336,7 @@ class AdminController
             Session::flash('error', $res['message']);
         }
 
-        header('Location: /admin/payments.php');
+        header('Location: /admin/payments');
         exit;
     }
 }

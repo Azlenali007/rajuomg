@@ -21,7 +21,7 @@ class AuthController
     public function showLogin(): void
     {
         if (Auth::check()) {
-            header('Location: /dashboard.php');
+            header('Location: /dashboard');
             exit;
         }
         View::render('auth/login', ['error' => Session::flash('error'), 'success' => Session::flash('success')], null);
@@ -34,7 +34,7 @@ class AuthController
 
         if (empty($email) || empty($password)) {
             Session::flash('error', 'Please fill in both email and password.');
-            header('Location: /login.php');
+            header('Location: /login');
             exit;
         }
 
@@ -44,13 +44,13 @@ class AuthController
 
         if (!$user || !password_verify($password, $user['password_hash'])) {
             Session::flash('error', 'Invalid email credentials or password.');
-            header('Location: /login.php');
+            header('Location: /login');
             exit;
         }
 
         if ($user['status'] === 'suspended') {
             Session::flash('error', 'Your account has been suspended. Please contact support.');
-            header('Location: /login.php');
+            header('Location: /login');
             exit;
         }
 
@@ -60,9 +60,9 @@ class AuthController
         Auth::login($user);
 
         if ($user['role'] === 'super_admin') {
-            header('Location: /admin/dashboard.php');
+            header('Location: /admin/dashboard');
         } else {
-            header('Location: /dashboard.php');
+            header('Location: /dashboard');
         }
         exit;
     }
@@ -70,7 +70,7 @@ class AuthController
     public function showRegister(): void
     {
         if (Auth::check()) {
-            header('Location: /dashboard.php');
+            header('Location: /dashboard');
             exit;
         }
         View::render('auth/register', ['error' => Session::flash('error')], null);
@@ -84,7 +84,7 @@ class AuthController
 
         if (strlen($name) < 2 || !filter_var($email, FILTER_VALIDATE_EMAIL) || strlen($password) < 6) {
             Session::flash('error', 'Please provide a valid name, email, and password (minimum 6 characters).');
-            header('Location: /register.php');
+            header('Location: /register');
             exit;
         }
 
@@ -93,7 +93,7 @@ class AuthController
         $chk->execute([$email]);
         if ($chk->fetch()) {
             Session::flash('error', 'This email is already registered. Please log in.');
-            header('Location: /register.php');
+            header('Location: /register');
             exit;
         }
 
@@ -108,14 +108,14 @@ class AuthController
         $wIns->execute([$userId]);
 
         Session::flash('success', 'Registration successful! You may now sign in.');
-        header('Location: /login.php');
+        header('Location: /login');
         exit;
     }
 
     public function logout(): void
     {
         Auth::logout();
-        header('Location: /login.php');
+        header('Location: /login');
         exit;
     }
 }

@@ -24,14 +24,12 @@ class OrderController
     }
 
     /**
-     * Display live services catalog for ordering
+     * Display live services catalog for ordering (public landing page & dashboard)
      */
     public function showServices(): void
     {
-        Auth::requireLogin();
-        $userId = (int)Auth::id();
-
-        $wallet = $this->walletService->getWallet($userId);
+        $userId = Auth::id();
+        $wallet = $userId ? $this->walletService->getWallet($userId) : null;
 
         $services = $this->pdo->query("
             SELECT s.*, 
@@ -74,7 +72,7 @@ class OrderController
         $order = $stmt->fetch();
 
         if (!$order) {
-            header('Location: /orders.php');
+            header('Location: /orders');
             exit;
         }
 

@@ -217,7 +217,7 @@ class WalletController
             Session::flash('error', $result['message']);
         }
 
-        header('Location: /wallet.php');
+        header('Location: /wallet');
         exit;
     }
 

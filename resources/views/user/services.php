@@ -6,14 +6,23 @@
             <h1 class="text-2xl font-bold tracking-tight text-slate-900">SMS Verification Services</h1>
             <p class="text-sm text-slate-500">Select a platform to receive an instant temporary verification number.</p>
         </div>
-        <div class="flex items-center gap-4">
-            <div class="bg-white border border-slate-200 rounded-lg px-4 py-2 flex items-center gap-3 shadow-sm">
-                <span class="text-xs text-slate-500">Wallet Balance:</span>
-                <span class="font-mono tabular-nums font-bold text-brand-700">$<?= number_format((float)($wallet['balance'] ?? 0), 2) ?></span>
-            </div>
-            <a href="/wallet" class="px-3.5 py-2 text-xs font-semibold text-white bg-brand-600 hover:bg-brand-700 rounded-lg shadow-sm transition-colors whitespace-nowrap">
-                Add Funds
-            </a>
+        <div class="flex items-center gap-3">
+            <?php if ($wallet !== null): ?>
+                <div class="bg-white border border-slate-200 rounded-lg px-4 py-2 flex items-center gap-3 shadow-sm">
+                    <span class="text-xs text-slate-500">Wallet Balance:</span>
+                    <span class="font-mono tabular-nums font-bold text-brand-700">$<?= number_format((float)($wallet['balance'] ?? 0), 2) ?></span>
+                </div>
+                <a href="/wallet" class="px-3.5 py-2 text-xs font-semibold text-white bg-brand-600 hover:bg-brand-700 rounded-lg shadow-sm transition-colors whitespace-nowrap">
+                    Add Funds
+                </a>
+            <?php else: ?>
+                <a href="/login" class="px-3.5 py-2 text-xs font-semibold text-slate-700 bg-white border border-slate-300 hover:bg-slate-50 rounded-lg shadow-sm transition-colors whitespace-nowrap">
+                    Sign In
+                </a>
+                <a href="/register" class="px-3.5 py-2 text-xs font-semibold text-white bg-brand-600 hover:bg-brand-700 rounded-lg shadow-sm transition-colors whitespace-nowrap">
+                    Register Free
+                </a>
+            <?php endif; ?>
         </div>
     </div>
 
@@ -93,6 +102,7 @@ function servicesMarketplace() {
         search: '',
         selectedCountry: <?= !empty($countries[0]['id']) ? $countries[0]['id'] : 1 ?>,
         loading: false,
+        isLoggedIn: <?= \App\Core\Auth::check() ? 'true' : 'false' ?>,
 
         matchesSearch(name, code) {
             if (!this.search.trim()) return true;
@@ -101,6 +111,24 @@ function servicesMarketplace() {
         },
 
         async buyNumber(serviceId, serviceName, price) {
+            if (!this.isLoggedIn) {
+                const prompt = await Swal.fire({
+                    title: 'Sign In Required',
+                    text: `Please sign in or create an account to order temporary numbers for ${serviceName}.`,
+                    icon: 'info',
+                    showCancelButton: true,
+                    confirmButtonColor: '#7c3aed',
+                    confirmButtonText: 'Sign In',
+                    cancelButtonText: 'Create Account'
+                });
+                if (prompt.isConfirmed) {
+                    window.location.href = '/login';
+                } else if (prompt.dismiss === Swal.DismissReason.cancel) {
+                    window.location.href = '/register';
+                }
+                return;
+            }
+
             const confirm = await Swal.fire({
                 title: 'Order Phone Number?',
                 text: `Acquire temporary number for ${serviceName} for $${price.toFixed(2)}? (Unused numbers are 100% refunded after 15 mins).`,

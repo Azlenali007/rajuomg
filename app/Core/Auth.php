@@ -55,8 +55,14 @@ class Auth
     public static function requireLogin(): void
     {
         if (!self::check()) {
+            if (str_starts_with($_SERVER['REQUEST_URI'] ?? '', '/api/')) {
+                header('Content-Type: application/json');
+                http_response_code(401);
+                echo json_encode(['success' => false, 'message' => 'Authentication required.', 'redirect' => '/login']);
+                exit;
+            }
             Session::flash('error', 'Please log in to continue.');
-            header('Location: /login.php');
+            header('Location: /login');
             exit;
         }
     }
