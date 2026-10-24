@@ -22,6 +22,9 @@ Router::post('/admin/providers/import-catalog', [AdminController::class, 'import
 Router::get('/admin/services', [AdminController::class, 'services']);
 Router::get('/admin/services.php', [AdminController::class, 'services']);
 Router::post('/admin/services/price', [AdminController::class, 'updateServicePrice']);
+Router::post('/admin/services/bulk-delete', [AdminController::class, 'bulkDeleteServices']);
+Router::post('/admin/services/delete-all', [AdminController::class, 'deleteAllServices']);
+Router::post('/admin/services/bulk-margin', [AdminController::class, 'bulkSetMargin']);
 
 Router::get('/admin/orders', [AdminController::class, 'orders']);
 Router::get('/admin/orders.php', [AdminController::class, 'orders']);

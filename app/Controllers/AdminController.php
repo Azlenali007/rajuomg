@@ -309,15 +309,26 @@ class AdminController
 
         $services = $this->pdo->query("
             SELECT s.*, 
-                   COUNT(ps.id) as mapped_countries,
-                   AVG(ps.provider_cost) as avg_cost
+                   COUNT(DISTINCT ps.id) as mapped_countries,
+                   COALESCE(AVG(ps.provider_cost), 0) as avg_cost,
+                   COUNT(DISTINCT o.id) as orders_count
             FROM services s
             LEFT JOIN provider_services ps ON s.id = ps.service_id
+            LEFT JOIN orders o ON s.id = o.service_id
             GROUP BY s.id
             ORDER BY s.service_name ASC
         ")->fetchAll();
 
-        View::render('admin/services', ['services' => $services], 'admin');
+        $countries = $this->pdo->query("SELECT * FROM countries WHERE is_active = 1 ORDER BY country_name ASC")->fetchAll();
+        $provider = $this->pdo->query("SELECT * FROM providers LIMIT 1")->fetch();
+
+        View::render('admin/services', [
+            'services' => $services,
+            'countries' => $countries,
+            'provider' => $provider,
+            'success' => Session::flash('success'),
+            'error' => Session::flash('error')
+        ], 'admin');
     }
 
     /**
@@ -336,6 +347,309 @@ class AdminController
         Session::flash('success', 'Service updated successfully.');
         header('Location: /admin/services');
         exit;
+    }
+
+    /**
+     * Bulk Delete Selected Services
+     * Safely preserves historical orders and customer records
+     */
+    public function bulkDeleteServices(): void
+    {
+        Auth::requireSuperAdmin();
+        $adminId = (int)Auth::id();
+
+        // Support both POST array and JSON payload
+        $rawIds = $_POST['service_ids'] ?? [];
+        if (is_string($rawIds)) {
+            $rawIds = explode(',', $rawIds);
+        }
+
+        $serviceIds = array_values(array_filter(array_map('intval', (array)$rawIds), fn($id) => $id > 0));
+
+        if (empty($serviceIds)) {
+            if ($this->isJsonRequest()) {
+                header('Content-Type: application/json');
+                echo json_encode(['success' => false, 'message' => 'No services selected for deletion.']);
+                exit;
+            }
+            Session::flash('error', 'No services selected for deletion.');
+            header('Location: /admin/services');
+            exit;
+        }
+
+        $deleted = 0;
+        $deactivated = 0;
+
+        $this->pdo->beginTransaction();
+        try {
+            $chkOrdersStmt = $this->pdo->prepare("SELECT COUNT(*) FROM orders WHERE service_id = ?");
+            $delMapStmt = $this->pdo->prepare("DELETE FROM provider_services WHERE service_id = ?");
+            $delSrvStmt = $this->pdo->prepare("DELETE FROM services WHERE id = ?");
+            $deactSrvStmt = $this->pdo->prepare("UPDATE services SET is_active = 0, updated_at = NOW() WHERE id = ?");
+
+            foreach ($serviceIds as $id) {
+                $chkOrdersStmt->execute([$id]);
+                $orderCount = (int)$chkOrdersStmt->fetchColumn();
+
+                if ($orderCount > 0) {
+                    // Service is referenced by existing user orders: Preserve historical records!
+                    $delMapStmt->execute([$id]);
+                    $deactSrvStmt->execute([$id]);
+                    $deactivated++;
+                } else {
+                    // No existing orders: Safe to delete completely
+                    $delMapStmt->execute([$id]);
+                    $delSrvStmt->execute([$id]);
+                    $deleted++;
+                }
+            }
+
+            // Audit log
+            $this->pdo->prepare("
+                INSERT INTO admin_audit_logs (admin_id, action, target_type, target_id, details_json, created_at)
+                VALUES (?, 'BULK_DELETE_SERVICES', 'services', ?, ?, NOW())
+            ")->execute([$adminId, implode(',', $serviceIds), json_encode(['deleted' => $deleted, 'deactivated' => $deactivated])]);
+
+            $this->pdo->commit();
+
+            $total = $deleted + $deactivated;
+            $msg = "Successfully processed {$total} services: {$deleted} permanently deleted" . ($deactivated > 0 ? ", {$deactivated} deactivated to preserve historical order records." : ".");
+
+            if ($this->isJsonRequest()) {
+                header('Content-Type: application/json');
+                echo json_encode(['success' => true, 'deleted' => $deleted, 'deactivated' => $deactivated, 'message' => $msg]);
+                exit;
+            }
+
+            Session::flash('success', $msg);
+            header('Location: /admin/services');
+            exit;
+        } catch (\Exception $e) {
+            $this->pdo->rollBack();
+            if ($this->isJsonRequest()) {
+                header('Content-Type: application/json');
+                echo json_encode(['success' => false, 'message' => 'Bulk deletion error: ' . $e->getMessage()]);
+                exit;
+            }
+            Session::flash('error', 'Bulk deletion error: ' . $e->getMessage());
+            header('Location: /admin/services');
+            exit;
+        }
+    }
+
+    /**
+     * Delete All Services
+     * Deliberate administrator action requiring explicit confirmation.
+     * Safely preserves historical orders and customer records.
+     */
+    public function deleteAllServices(): void
+    {
+        Auth::requireSuperAdmin();
+        $adminId = (int)Auth::id();
+
+        $confirmation = trim((string)($_POST['confirm'] ?? ''));
+        if ($confirmation !== 'DELETE_ALL' && $confirmation !== '1') {
+            $errMsg = 'Deletion aborted: Explicit confirmation keyword required.';
+            if ($this->isJsonRequest()) {
+                header('Content-Type: application/json');
+                echo json_encode(['success' => false, 'message' => $errMsg]);
+                exit;
+            }
+            Session::flash('error', $errMsg);
+            header('Location: /admin/services');
+            exit;
+        }
+
+        $deleted = 0;
+        $deactivated = 0;
+
+        $this->pdo->beginTransaction();
+        try {
+            $allServiceIds = $this->pdo->query("SELECT id FROM services")->fetchAll(PDO::FETCH_COLUMN);
+
+            $chkOrdersStmt = $this->pdo->prepare("SELECT COUNT(*) FROM orders WHERE service_id = ?");
+            $delMapStmt = $this->pdo->prepare("DELETE FROM provider_services WHERE service_id = ?");
+            $delSrvStmt = $this->pdo->prepare("DELETE FROM services WHERE id = ?");
+            $deactSrvStmt = $this->pdo->prepare("UPDATE services SET is_active = 0, updated_at = NOW() WHERE id = ?");
+
+            foreach ($allServiceIds as $id) {
+                $id = (int)$id;
+                $chkOrdersStmt->execute([$id]);
+                $orderCount = (int)$chkOrdersStmt->fetchColumn();
+
+                if ($orderCount > 0) {
+                    $delMapStmt->execute([$id]);
+                    $deactSrvStmt->execute([$id]);
+                    $deactivated++;
+                } else {
+                    $delMapStmt->execute([$id]);
+                    $delSrvStmt->execute([$id]);
+                    $deleted++;
+                }
+            }
+
+            // Audit log
+            $this->pdo->prepare("
+                INSERT INTO admin_audit_logs (admin_id, action, target_type, target_id, details_json, created_at)
+                VALUES (?, 'DELETE_ALL_SERVICES', 'services', 'ALL', ?, NOW())
+            ")->execute([$adminId, json_encode(['deleted' => $deleted, 'deactivated' => $deactivated])]);
+
+            $this->pdo->commit();
+
+            $total = $deleted + $deactivated;
+            $msg = "Delete All complete: {$deleted} services removed" . ($deactivated > 0 ? ", {$deactivated} services deactivated to preserve existing customer order history." : ".");
+
+            if ($this->isJsonRequest()) {
+                header('Content-Type: application/json');
+                echo json_encode(['success' => true, 'deleted' => $deleted, 'deactivated' => $deactivated, 'message' => $msg]);
+                exit;
+            }
+
+            Session::flash('success', $msg);
+            header('Location: /admin/services');
+            exit;
+        } catch (\Exception $e) {
+            $this->pdo->rollBack();
+            if ($this->isJsonRequest()) {
+                header('Content-Type: application/json');
+                echo json_encode(['success' => false, 'message' => 'Delete All failed: ' . $e->getMessage()]);
+                exit;
+            }
+            Session::flash('error', 'Delete All failed: ' . $e->getMessage());
+            header('Location: /admin/services');
+            exit;
+        }
+    }
+
+    /**
+     * Bulk Set Margin / Pricing on Selected or All Services
+     */
+    public function bulkSetMargin(): void
+    {
+        Auth::requireSuperAdmin();
+        $adminId = (int)Auth::id();
+
+        $scope = trim((string)($_POST['scope'] ?? 'selected')); // 'selected' or 'all'
+        $marginType = trim((string)($_POST['margin_type'] ?? 'percentage')); // 'percentage' or 'fixed'
+        $marginValue = (float)($_POST['margin_value'] ?? 0.0);
+
+        if ($marginValue < 0) {
+            $err = 'Margin value cannot be negative.';
+            if ($this->isJsonRequest()) {
+                header('Content-Type: application/json');
+                echo json_encode(['success' => false, 'message' => $err]);
+                exit;
+            }
+            Session::flash('error', $err);
+            header('Location: /admin/services');
+            exit;
+        }
+
+        $rawIds = $_POST['service_ids'] ?? [];
+        if (is_string($rawIds)) {
+            $rawIds = explode(',', $rawIds);
+        }
+        $serviceIds = array_values(array_filter(array_map('intval', (array)$rawIds), fn($id) => $id > 0));
+
+        if ($scope === 'selected' && empty($serviceIds)) {
+            $err = 'No services selected for margin update.';
+            if ($this->isJsonRequest()) {
+                header('Content-Type: application/json');
+                echo json_encode(['success' => false, 'message' => $err]);
+                exit;
+            }
+            Session::flash('error', $err);
+            header('Location: /admin/services');
+            exit;
+        }
+
+        $this->pdo->beginTransaction();
+        try {
+            if ($scope === 'selected') {
+                $placeholders = implode(',', array_fill(0, count($serviceIds), '?'));
+                $stmt = $this->pdo->prepare("
+                    SELECT s.id, s.service_name, s.custom_price, s.profit_margin_percent, COALESCE(AVG(ps.provider_cost), 0) as avg_cost 
+                    FROM services s 
+                    LEFT JOIN provider_services ps ON s.id = ps.service_id 
+                    WHERE s.id IN ($placeholders) 
+                    GROUP BY s.id
+                ");
+                $stmt->execute($serviceIds);
+                $targets = $stmt->fetchAll();
+            } else {
+                $targets = $this->pdo->query("
+                    SELECT s.id, s.service_name, s.custom_price, s.profit_margin_percent, COALESCE(AVG(ps.provider_cost), 0) as avg_cost 
+                    FROM services s 
+                    LEFT JOIN provider_services ps ON s.id = ps.service_id 
+                    GROUP BY s.id
+                ")->fetchAll();
+            }
+
+            $updateStmt = $this->pdo->prepare("UPDATE services SET custom_price = ?, profit_margin_percent = ?, updated_at = NOW() WHERE id = ?");
+            $updated = 0;
+
+            foreach ($targets as $srv) {
+                $cost = (float)$srv['avg_cost'];
+                if ($cost <= 0.0) {
+                    $cost = (float)$srv['custom_price'];
+                }
+
+                if ($marginType === 'percentage') {
+                    // Margin percent above provider cost
+                    $newPrice = round(max(0.10, $cost * (1.0 + ($marginValue / 100.0))), 2);
+                    $newMargin = $marginValue;
+                } else {
+                    // Fixed addition above provider cost
+                    $newPrice = round(max(0.10, $cost + $marginValue), 2);
+                    $newMargin = ($cost > 0 && $newPrice > 0) ? round((($newPrice - $cost) / $newPrice) * 100, 2) : 20.0;
+                }
+
+                $updateStmt->execute([$newPrice, $newMargin, $srv['id']]);
+                $updated++;
+            }
+
+            // Audit log
+            $this->pdo->prepare("
+                INSERT INTO admin_audit_logs (admin_id, action, target_type, target_id, details_json, created_at)
+                VALUES (?, 'BULK_SET_MARGIN', 'services', ?, ?, NOW())
+            ")->execute([$adminId, $scope, json_encode(['margin_type' => $marginType, 'margin_value' => $marginValue, 'count' => $updated])]);
+
+            $this->pdo->commit();
+
+            $typeLabel = $marginType === 'percentage' ? "{$marginValue}%" : "\${$marginValue}";
+            $msg = "Successfully applied {$typeLabel} margin to {$updated} services.";
+
+            if ($this->isJsonRequest()) {
+                header('Content-Type: application/json');
+                echo json_encode(['success' => true, 'count' => $updated, 'message' => $msg]);
+                exit;
+            }
+
+            Session::flash('success', $msg);
+            header('Location: /admin/services');
+            exit;
+        } catch (\Exception $e) {
+            $this->pdo->rollBack();
+            if ($this->isJsonRequest()) {
+                header('Content-Type: application/json');
+                echo json_encode(['success' => false, 'message' => 'Bulk margin update failed: ' . $e->getMessage()]);
+                exit;
+            }
+            Session::flash('error', 'Bulk margin update failed: ' . $e->getMessage());
+            header('Location: /admin/services');
+            exit;
+        }
+    }
+
+    /**
+     * Check if request expects JSON response
+     */
+    private function isJsonRequest(): bool
+    {
+        $accept = $_SERVER['HTTP_ACCEPT'] ?? '';
+        $contentType = $_SERVER['CONTENT_TYPE'] ?? '';
+        $xReq = $_SERVER['HTTP_X_REQUESTED_WITH'] ?? '';
+        return str_contains($accept, 'application/json') || str_contains($contentType, 'application/json') || strtolower($xReq) === 'xmlhttprequest' || isset($_POST['format']) && $_POST['format'] === 'json';
     }
 
     /**

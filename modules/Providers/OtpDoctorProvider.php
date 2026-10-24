@@ -117,7 +117,7 @@ class OtpDoctorProvider implements ProviderInterface
     }
 
     /**
-     * Retrieve available countries
+     * Retrieve available countries (Active and validated only)
      */
     public function getCountries(): array
     {
@@ -137,13 +137,30 @@ class OtpDoctorProvider implements ProviderInterface
             $countries = [];
             foreach ($json as $key => $item) {
                 if (!is_array($item)) continue;
-                $code = strtolower((string)($item['code'] ?? $item['iso'] ?? $item['id'] ?? $key));
-                $name = (string)($item['name'] ?? $item['eng'] ?? $item['rus'] ?? 'Country ' . $key);
+
+                // Explicit active / visibility check according to provider status rules
+                if (isset($item['visible']) && ($item['visible'] === 0 || $item['visible'] === '0' || $item['visible'] === false)) continue;
+                if (isset($item['status']) && in_array(strtolower((string)$item['status']), ['inactive', 'disabled', 'unavailable', '0', 'false'])) continue;
+                if (isset($item['enabled']) && ($item['enabled'] === 0 || $item['enabled'] === '0' || $item['enabled'] === false)) continue;
+                if (isset($item['is_active']) && ($item['is_active'] === 0 || $item['is_active'] === '0' || $item['is_active'] === false)) continue;
+
+                $code = strtolower(trim((string)($item['code'] ?? $item['iso'] ?? $item['id'] ?? $key)));
+                $name = trim((string)($item['name'] ?? $item['eng'] ?? $item['rus'] ?? ''));
+                if (empty($name)) {
+                    $name = 'Country ' . strtoupper($code);
+                }
                 $dial = isset($item['prefix']) ? '+' . ltrim((string)$item['prefix'], '+') : null;
+
+                // Validate required fields
+                if (empty($code) || empty($name)) {
+                    continue;
+                }
+
                 $countries[] = [
                     'code' => $code,
                     'name' => $name,
-                    'dial_code' => $dial
+                    'dial_code' => $dial,
+                    'is_active' => 1
                 ];
             }
             return ['success' => true, 'countries' => $countries, 'message' => 'Countries loaded'];
@@ -153,7 +170,7 @@ class OtpDoctorProvider implements ProviderInterface
     }
 
     /**
-     * Retrieve services for a country
+     * Retrieve services for a country (Active and available services only)
      */
     public function getServices(string $countryCode): array
     {
@@ -174,13 +191,58 @@ class OtpDoctorProvider implements ProviderInterface
 
         $json = json_decode($body, true);
         if (json_last_error() === JSON_ERROR_NONE && is_array($json)) {
+            $serviceItems = $json;
+            // Handle nested country object responses (e.g. {"in": {...}} or {"0": {...}})
+            if (isset($json[$countryCode]) && is_array($json[$countryCode])) {
+                $serviceItems = $json[$countryCode];
+            } elseif (count($json) === 1 && is_array(reset($json))) {
+                $first = reset($json);
+                if (is_array($first) && !isset($first['cost']) && !isset($first['price'])) {
+                    $serviceItems = $first;
+                }
+            }
+
             $services = [];
-            foreach ($json as $code => $data) {
+            foreach ($serviceItems as $code => $data) {
+                $serviceCode = strtolower(trim((string)$code));
+                if (empty($serviceCode)) continue;
+
+                // Filter out inactive / disabled / discontinued services based on provider fields
+                $isActive = true;
+                if (is_array($data)) {
+                    if (isset($data['status']) && in_array(strtolower((string)$data['status']), ['inactive', 'disabled', 'discontinued', 'unavailable', '0', 'false'])) {
+                        $isActive = false;
+                    }
+                    if (isset($data['visible']) && ($data['visible'] === 0 || $data['visible'] === '0' || $data['visible'] === false)) {
+                        $isActive = false;
+                    }
+                    if (isset($data['enabled']) && ($data['enabled'] === 0 || $data['enabled'] === '0' || $data['enabled'] === false)) {
+                        $isActive = false;
+                    }
+                    if (isset($data['is_active']) && ($data['is_active'] === 0 || $data['is_active'] === '0' || $data['is_active'] === false)) {
+                        $isActive = false;
+                    }
+                }
+
+                if (!$isActive) {
+                    continue;
+                }
+
+                $name = is_array($data) ? ($data['name'] ?? strtoupper($serviceCode)) : strtoupper($serviceCode);
+                $cost = is_array($data) ? (float)($data['cost'] ?? $data['price'] ?? 0.0) : (float)$data;
+                $stock = is_array($data) ? (int)($data['count'] ?? $data['quantity'] ?? $data['stock'] ?? 10) : 10;
+
+                // Validate code length and name
+                if (strlen($serviceCode) < 1 || strlen($serviceCode) > 50) {
+                    continue;
+                }
+
                 $services[] = [
-                    'service_code' => strtolower((string)$code),
-                    'name' => is_array($data) ? ($data['name'] ?? strtoupper((string)$code)) : strtoupper((string)$code),
-                    'cost' => is_array($data) ? (float)($data['cost'] ?? $data['price'] ?? 0.0) : (float)$data,
-                    'stock' => is_array($data) ? (int)($data['count'] ?? $data['quantity'] ?? 0) : 10,
+                    'service_code' => $serviceCode,
+                    'name' => trim((string)$name),
+                    'cost' => $cost,
+                    'stock' => max(0, $stock),
+                    'is_active' => 1
                 ];
             }
             return ['success' => true, 'services' => $services, 'message' => 'Services loaded'];
