@@ -7,14 +7,6 @@
         </div>
         <div class="flex flex-wrap items-center gap-2">
             <button 
-                @click="importCatalog(1)"
-                :disabled="catalogImporting"
-                class="px-3.5 py-2 text-xs font-bold text-slate-700 bg-white border border-slate-300 hover:bg-slate-50 rounded-xl shadow-xs transition-colors flex items-center gap-1.5"
-            >
-                <svg class="w-3.5 h-3.5 text-brand-600" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
-                <span>Import Standard Catalog</span>
-            </button>
-            <button 
                 @click="testConnection(1)"
                 :disabled="testing"
                 class="px-3.5 py-2 text-xs font-bold text-slate-700 bg-white border border-slate-300 hover:bg-slate-50 rounded-xl shadow-xs transition-colors flex items-center gap-1.5"
